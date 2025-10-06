@@ -8,6 +8,8 @@
     - [SegFormer](#segformer)
   - [Vlasis](#vlasis)
     - [ResNet50 + DCN (Deformable Convolution Network) + Cascade Mask R-CNN](#resnet50--dcn-deformable-convolution-network--cascade-mask-r-cnn)
+  - [Juan](#juan)
+    - [Corn Instance Segmentation Model (CSM)](#corn-instance-segmentation-model-csm)
 
 ## Gustavo
 
@@ -146,3 +148,38 @@ Each cascade stage includes a fully convolutional Mask Head, which creates a pix
 The learning rate during model training is automatically scaled based on batch size: larger batches use higher LR, smaller batches use lower LR. This ensures stable convergence across a range of hardware setups or memory constraints, making the model practical for large agricultural datasets.
 
 **Results Obtained:** The model outperforms previous methods, with up to +3.46% improved segmentation accuracy over other state-of-the-art models based on Mask R-CNN, RetinaNet, and Hybrid Task Cascade architectures.
+
+## Juan
+### Corn Instance Segmentation Model (CSM)
+
+**Papers Links:** [CSM](https://nam04.safelinks.protection.outlook.com/GetUrlReputation). Original Publication: [Mask2Former](https://arxiv.org/pdf/2112.01527).
+
+**Objective Organ:** Corn Ears
+
+**The model architecture short description:**
+
+CSM uses Mask2Former, which uses masked attention instead of cross attention to improve its performance for instance segmentation. Cross attention allows the decoder to attend to all pixels in the image, including background pixels. This can be problematic for instance segmentation, as the decoder can be easily distracted by background noise. 
+
+Masked attention restricts the attention of the decoder to the foreground region of each object. This helps the decoder to focus on the relevant features for each object, and it also helps to prevent the decoder from attending to background noise. 
+
+Moreover, masked attention is more efficient than cross attention, which can reduce the training and inference time of Mask2Former.
+
+To tackle the challenge of small objects, Mask2Former uses a multi-scale feature representation. This means that it uses features at different scales or resolutions, which allows it to capture both fine-grained details and broader context information. 
+
+For optimal processing of these multi-scale features, Mask2Former systematically directs a single scale of the multi-scale feature to an individual Transformer decoder layer during each iteration. Consequently, each Transformer decoder layer process features at a designated scale, such as 1/32, 1/16, or 1/8. This approach allows Mask2Former to significantly enhance its ability to adeptly manage objects of varying sizes.
+
+CSM combines object identification and instance segmentation techniques to optimize this segmentation process. In order to correctly locate target locations, it automatically creates bounding boxes. SAM (SegmentAny-thingModel) carries out high-precision segmentation based on the precise bounding boxes produced by RT-DETR(Real-TimeDetectionTransformer) within the CSM framework. The DWRP3 dilated residual module, the LoRA fine-tuning strategy, and the CFC and SFC feature calibration modules allow CSM to function consistently in a variety of complex environments.
+
+![CSM](images/CSM.png)
+
+**BACKBONE:** ResNet18 + RT-DETR( real time detection transformer) composed by DWRP3 module (composed by DWR dilated wide residual module) + Efficient Hybrid encoder + Transformer decoder
+
+**Neck:** composed by context feature calibration (CFC) and spatial feature calibration (SFC)
+
+![CSM Detection](images/CSM-Detection.png)
+
+![CSM SAM Encoder](images/CSM%20SAM%20Encder.png)
+
+![CSM SAM Decoder](images/CSM%20SAM%20Decoder.png)
+
+**Results Obtained:** CSM outperforms Mask R-CNN, Mask2Former, and YOLACT in precision by 3.5%, 4.3%, and 12.7%, respectively, achieving 95.5% precision, 84.8% mean intersection-over-union (mIoU), and 88.4% recall. 
