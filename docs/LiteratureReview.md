@@ -152,7 +152,7 @@ The learning rate during model training is automatically scaled based on batch s
 ## Juan
 ### Corn Instance Segmentation Model (CSM)
 
-**Papers Links:** [CSM](https://nam04.safelinks.protection.outlook.com/GetUrlReputation). Original Publication: [Mask2Former](https://arxiv.org/pdf/2112.01527).
+**Papers Links:** [CSM](https://link.springer.com/chapter/10.1007/978-3-032-04555-3_18). Original Publication: [Mask2Former](https://arxiv.org/pdf/2112.01527).
 
 **Objective Organ:** Corn Ears
 
