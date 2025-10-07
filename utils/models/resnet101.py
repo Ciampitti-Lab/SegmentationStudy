@@ -1,5 +1,5 @@
 import torch.nn as nn
-from utils.modules.bottleneck import Bottleneck
+from utils.modules.bottleneckResNet import Bottleneck
 
 class ResNetBackbone(nn.Module):
     """
