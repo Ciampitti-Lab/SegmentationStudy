@@ -10,7 +10,7 @@ from utils.modules.roiAlignPool import RoIAlignPool
 
 
 class MaskRCNN(nn.Module):
-    def __init__(self, backbone, num_classes=2, fpn_out_channels=256):
+    def __init__(self, backbone, num_classes=1, fpn_out_channels=128, segmentation_mode=False):
         """
         backbone: should return dict {"c2","c3","c4","c5"} when called with an image tensor.
         num_classes: number of object classes (including background if using classification that way)
@@ -20,12 +20,19 @@ class MaskRCNN(nn.Module):
         # C2..C5 channel sizes expected: [256,512,1024,2048] for ResNet101
         in_channels_list = [256, 512, 1024, 2048]
         self.fpn = FPN(in_channels_list, out_channels=fpn_out_channels)
+        self.segmentation_mode = segmentation_mode
         # anchor generator for P2..P6
         sizes = ((32,), (64,), (128,), (256,), (512,))
         strides = (4, 8, 16, 32, 64)
         self.anchor_generator = AnchorGenerator(sizes=sizes, aspect_ratios=(0.5,1.0,2.0), strides=strides)
-        self.rpn = RegionProposalNetwork(self.anchor_generator, in_channels=fpn_out_channels,
-                                         pre_nms_top_n=2000, post_nms_top_n=1000, nms_thresh=0.7, min_size=0)
+        self.rpn = RegionProposalNetwork(
+            self.anchor_generator,
+            in_channels=fpn_out_channels,
+            pre_nms_top_n=200,      # was 2000
+            post_nms_top_n=100,     # was 1000
+            nms_thresh=0.7,
+            min_size=0
+        )
         # RoIAlign pool
         self.roi_pool = RoIAlignPool(output_size=(7,7))
         # Box head and mask head
@@ -33,9 +40,40 @@ class MaskRCNN(nn.Module):
                                      representation_size=1024, num_classes=num_classes)
         # For mask head we use a larger pooled size (14x14 typical)
         self.mask_roi_pool = RoIAlignPool(output_size=(14,14))
-        self.mask_head = MaskRCNNMaskHead(in_channels=fpn_out_channels, conv_layers=4, conv_dim=256, num_classes=num_classes)
+        self.mask_head = MaskRCNNMaskHead(
+            in_channels=fpn_out_channels,
+            conv_layers=4,
+            conv_dim=128,  # was 256
+            num_classes=num_classes
+        )
 
     def forward(self, images: torch.Tensor):
+        """
+        images: Tensor (B,3,H,W).
+        If segmentation_mode: returns [B, 1, H, W] for segmentation training.
+        Else: returns detection dict/list.
+        """
+        B, _, H, W = images.shape
+        if not self.segmentation_mode:
+            # Only support B=1 for detection mode (as before)
+            assert B == 1, "Detection mode only supports batch size 1."
+            return self._forward_single(images)
+        # Segmentation mode: return [B, 1, H, W]
+        device = images.device
+        seg_masks = torch.zeros((B, 1, H, W), device=device)
+        for b in range(B):
+            img = images[b:b+1]
+            out = self._forward_single(img)
+            # out["masks"]: [1, N, 1, H, W] or [N, 1, H, W]
+            masks = out["masks"].squeeze(0) if out["masks"].dim() == 5 else out["masks"]
+            if masks.numel() > 0:
+                # Union of all instance masks (pixel-wise max)
+                seg_mask = masks.max(dim=0)[0]  # [1, H, W]
+                seg_masks[b] = seg_mask
+            # else leave as zeros
+        return seg_masks
+
+    def _forward_single(self, images: torch.Tensor):
         """
         images: Tensor (B,3,H,W). Implementation below currently supports B=1 for simplicity.
         Returns: dict with 'boxes', 'scores', 'labels', 'masks' for detections.
@@ -93,4 +131,9 @@ class MaskRCNN(nn.Module):
             masks.append(m_up)
         masks = torch.stack(masks, dim=0)  # (N,1,H,W)
 
-        return {"boxes": final_boxes, "scores": scores_top, "labels": labels, "masks": masks}
+        return {
+            "boxes": final_boxes.unsqueeze(0),   # [1, N, 4]
+            "scores": scores_top.unsqueeze(0),   # [1, N]
+            "labels": labels.unsqueeze(0),       # [1, N]
+            "masks": masks.unsqueeze(0)          # [1, N, 1, H, W]
+        }
