@@ -4,6 +4,7 @@
   - [Gustavo](#gustavo)
     - [Mask-RCNN + ResNet101](#mask-rcnn--resnet101)
     - [MobileNetv2 + DeepLabv3+](#mobilenetv2--deeplabv3)
+    - [UNet](#unet)
   - [Jorge](#jorge)
     - [SegFormer](#segformer)
   - [Vlasis](#vlasis)
@@ -80,6 +81,48 @@
 
 
 **Results Obtained:** Pixel Accuracy of 99%, higher than other high-level models.
+
+### UNet
+
+**Papers Links:** [Sorghum Panicles from Aerial Images](https://www.frontiersin.org/journals/plant-science/articles/10.3389/fpls.2020.534853/full). Original Publications: [UNET](https://arxiv.org/abs/1505.04597)
+
+**Ojective Organ:** Sorghum Panicles
+
+**The model architecture short description:**
+
+U-Net is a fully convolutional network designed for semantic segmentation. It follows a U-shaped architecture with a contracting path (encoder) and an expanding path (decoder), connected by skip connections.
+
+![UNET](images/UNETpng.png)
+
+* Encoder (Contracting Path)
+  * Series of convolutional blocks followed by max pooling.
+  * Each block typically consists of:
+    * Two 3×3 convolutions
+    * ReLU activation
+    * Batch normalization (optional)
+  * Max pooling reduces spatial dimensions while increasing feature depth.
+
+* Bottleneck
+  * The deepest part of the network.
+  * Captures high-level features with two convolutional layers.
+  * No pooling here, but the number of filters is highest.
+
+* Decoder (Expanding Path)
+  * Series of upsampling operations (e.g., transposed convolutions or bilinear upsampling).
+  * Each upsampling step is followed by:
+    * Concatenation with corresponding encoder features (skip connections)
+    * Two 3×3 convolutions + ReLU
+
+*  Skip Connections
+   *  Connect encoder layers to decoder layers at the same resolution.
+   *  Help recover spatial information lost during downsampling.
+   *  Improve localization and boundary accuracy.
+
+* Final Layer
+  * A 1×1 convolution maps the output to the desired number of classes.
+  * Often followed by a softmax or sigmoid activation depending on the task.
+
+**Results Obtained:** Accuracy of 95.5% and a root mean square error (RMSE) of 2.5
 
 ## Jorge
 
