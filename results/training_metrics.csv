@@ -3,3 +3,5 @@ DeepLabV3Plus,Wheat,89min,13M347K,16,52MB,0.1018s
 DeepLabV3Plus,Sorghum,147min,13M347K,17,52MB,0.1097s
 U-Net,Wheat,110min,9M416K,10,36MB,0.232s
 U-Net,Sorghum,374min,9M416K,15,36MB,0.311s
+SegFormer,Wheat,61min,5M125K,12,20MB,0.0817s
+SegFormer,Sorghum,193min,5M125K,16,20MB,0.0815s
