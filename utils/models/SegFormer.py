@@ -1,7 +1,5 @@
 from utils.modules.SegformerEncoder import mix_transformer
 from utils.modules.SegformerDecoder import segformer_head
-import numpy as np
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -16,7 +14,7 @@ class segformer(nn.Module):
                                     num_classes=num_classes, embed_dim=256)
 
         
-    def run(self,image): 
+    def forward(self,image):
         image_hw = image.shape[2:]
         x = self.backbone(image) #: Call Encoder
         x = self.decoder_head(x) #: Call Decoder

@@ -9,8 +9,10 @@
     - [SegFormer](#segformer)
   - [Vlasis](#vlasis)
     - [ResNet50 + DCN (Deformable Convolution Network) + Cascade Mask R-CNN](#resnet50--dcn-deformable-convolution-network--cascade-mask-r-cnn)
+    - [SegNet](#segnet)
   - [Juan](#juan)
     - [Corn Instance Segmentation Model (CSM)](#corn-instance-segmentation-model-csm)
+    - [MaskFormer](#maskformer)
 
 ## Gustavo
 
@@ -192,6 +194,35 @@ The learning rate during model training is automatically scaled based on batch s
 
 **Results Obtained:** The model outperforms previous methods, with up to +3.46% improved segmentation accuracy over other state-of-the-art models based on Mask R-CNN, RetinaNet, and Hybrid Task Cascade architectures.
 
+### SegNet
+
+**Papers Links:** [Sorghum Panicle Counting Aerial Image](https://www.mdpi.com/2072-4292/11/24/2939). Original Publications: [SegNet](https://arxiv.org/abs/1511.00561)
+
+**Objective Organ:** Sorghum panicle
+
+**The model architecture short description:**
+
+![SegNet](images/SegNet.webp)
+
+* Encoder (typically based on VGG16)
+  * Series of convolutional layers followed by ReLU and max pooling.
+  * Each pooling layer stores the indices of the max values (not just the pooled output).
+  * These indices are passed to the decoder to guide upsampling.
+
+* Decoder (SegNet’s key innovation)
+  * Upsampling is done using the stored max-pooling indices from the encoder.
+  * This avoids learning parameters for upsampling and helps retain spatial structure.
+  * After upsampling, each decoder block applies:
+    * Convolution
+    * Batch normalization
+    * ReLU activation
+  * This process is repeated for each encoder layer in reverse order.
+
+* Final Layer
+  * A final softmax classifier assigns a class label to each pixel.
+
+**Results Obtained:** Overall detection accuracy of 94%
+
 ## Juan
 ### Corn Instance Segmentation Model (CSM)
 
@@ -225,4 +256,40 @@ CSM combines object identification and instance segmentation techniques to optim
 
 ![CSM SAM Decoder](images/CSM%20SAM%20Decoder.png)
 
-**Results Obtained:** CSM outperforms Mask R-CNN, Mask2Former, and YOLACT in precision by 3.5%, 4.3%, and 12.7%, respectively, achieving 95.5% precision, 84.8% mean intersection-over-union (mIoU), and 88.4% recall. 
+**Results Obtained:** CSM outperforms Mask R-CNN, Mask2Former, and YOLACT in precision by 3.5%, 4.3%, and 12.7%, respectively, achieving 95.5% precision, 84.8% mean intersection-over-union (mIoU), and 88.4% recall.
+
+### MaskFormer
+
+**Papers Links:** [Crops, Weeds, and Leaves Instance Segmentation](https://arxiv.org/abs/2310.06582). Original Publication: [MaskFormer](https://arxiv.org/abs/2107.06278).
+
+**Objective Organ:** Crops, Weeds, and Leaves
+
+**The model architecture short description:**
+
+MaskFormer rethinks segmentation by predicting a set of masks and associated class labels, rather than assigning a class to each pixel directly. This approach unifies semantic and instance segmentation under a single framework.
+
+![MaskFormer](images/MaskFormer.png)
+
+* Backbone (Feature Extractor)
+  * Typically a Vision Transformer (ViT) or ResNet + FPN.
+  * Extracts multi-scale feature maps from the input image.
+
+* Pixel Decoder
+  * Converts backbone features into a high-resolution feature map.
+  * Often uses transformer-based decoder blocks or CNN-based upsampling.
+  * Produces a rich pixel-level representation for mask prediction.
+
+* Transformer Decoder (Mask Prediction Head)
+  * Takes a fixed set of learned queries (e.g., 100 queries).
+  * Each query predicts:
+    * A class label
+    * A mask embedding (not a mask directly)
+
+* Mask Embedding & Segmentation
+  * The mask embedding is dot-producted with the pixel-level features from the pixel decoder.
+  * This produces a soft mask for each query.
+  * The final output is a set of:
+    * Class labels
+    * Segmentation masks
+
+**Results Obtained:** Predicted Masks of 75.99
