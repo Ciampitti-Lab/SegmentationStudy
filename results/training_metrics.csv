@@ -5,3 +5,5 @@ U-Net,Wheat,110min,9M416K,10,36MB,0.232s
 U-Net,Sorghum,374min,9M416K,15,36MB,0.311s
 SegFormer,Wheat,61min,5M125K,12,20MB,0.0817s
 SegFormer,Sorghum,193min,5M125K,16,20MB,0.0815s
+SegNet,Wheat,530min,29M472K,13,115MB,0.333s
+SegNet,Sorghum,934min,29M472K,13,115MB,0.270s
