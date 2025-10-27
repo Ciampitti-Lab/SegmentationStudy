@@ -7,3 +7,5 @@ SegFormer,Wheat,61min,5M125K,12,20MB,0.0817s
 SegFormer,Sorghum,193min,5M125K,16,20MB,0.0815s
 SegNet,Wheat,530min,29M472K,13,115MB,0.333s
 SegNet,Sorghum,934min,29M472K,13,115MB,0.270s
+MaskFormer,Wheat,,45M297K,,,
+MaskFormer,Sorghum,,45M297K,,,
