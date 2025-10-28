@@ -1,0 +1,224 @@
+# Load necessary libraries
+```{r}
+library(tidyverse)
+library(patchwork)
+```
+
+# Data Import
+```{r}
+df <- read.csv("./results/model_evaluation_results.csv")
+head(df)
+```
+
+# Descriptive Statistics
+
+## Setting variables
+
+```{r}
+crops <- c("wheat", "sorghum")
+model_name <- c("DeepLabV3Plus", "U-NET", "SegNet", "SegFormer")
+metrics <- c("IoU", "Dice", "Precision", "Recall", "F1")
+```
+
+## Data summary
+```{r}
+summary(df)
+```
+
+## When removing outliers
+```{r}
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+    qnt <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm, ...)
+    H <- 1.5 * IQR(x, na.rm = na.rm)
+    y <- x
+    y[x < (qnt[1] - H)] <- NA
+    y[x > (qnt[2] + H)] <- NA
+    return(y)
+}
+
+df_no_outliers <- df %>%
+    mutate(across(all_of(metrics), ~remove_outliers(.x))) %>%
+    select(crop, modelname, all_of(metrics), genotype, collectiondate) %>%
+    drop_na()
+
+summary(df_no_outliers)
+
+table(df_no_outliers$crop, df_no_outliers$modelname)
+```
+
+## Getting Mean, Max, Min, var and cv.
+```{r}
+# Compute summary statistics by crop and model
+summary_stats <- df_no_outliers %>%
+    filter(modelname %in% model_name, crop %in% crops) %>%
+    group_by(crop, modelname) %>%
+    summarise(across(all_of(metrics),
+                                     list(mean = ~mean(.x, na.rm = TRUE),
+                                          max  = ~max(.x, na.rm = TRUE),
+                                          min  = ~min(.x, na.rm = TRUE),
+                                          var  = ~var(.x, na.rm = TRUE),
+                                          cv   = ~sd(.x, na.rm = TRUE) / mean(.x, na.rm = TRUE) * 100),
+                                     .names = "{.col}_{.fn}"),
+                        .groups = "drop")
+
+summary_stats_long <- summary_stats %>%
+    pivot_longer(cols = -c(crop, modelname),
+                             names_to = c("metric", "stat"),
+                             names_sep = "_",
+                             values_to = "value")
+
+print(summary_stats_long)
+
+write.csv(summary_stats_long, "./results/summary_statistics_by_crop_model_all.csv", row.names = FALSE)
+```
+
+## Plotting distributions
+```{r}
+df_new <- df_no_outliers %>%
+  filter(crop == "wheat", modelname == "SegNet")
+
+ggplot(df_new, aes(x = IoU)) +
+  geom_histogram(binwidth = 0.05, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Model IoU", x = "IoU", y = "Frequency") +
+  theme_minimal()
+```
+
+They mainly follow a left skewed distribution.
+For some models and metrics, the distribution were J shaded.
+
+## Boxplots for model comparison
+```{r}
+# Pivot metrics to long form and create a faceted boxplot for all metrics x crops
+df_long <- df_no_outliers %>%
+    filter(modelname %in% model_name, crop %in% crops) %>%
+    pivot_longer(cols = all_of(metrics), names_to = "metric", values_to = "value")
+
+p <- ggplot(df_long, aes(x = modelname, y = value, fill = modelname)) +
+    geom_boxplot(outlier.size = 0.8) +
+    facet_grid(metric ~ crop, scales = "free_y") +
+    labs(title = "Model comparison across metrics and crops", x = "Model", y = "Value") +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+                strip.text = element_text(size = 9),
+                legend.position = "bottom")
+
+# Print plot in the notebook
+p
+
+# Save combined image
+ggsave("./results/boxplots_all_metrics_crops_all.png", plot = p, width = 14, height = 20, dpi = 700)
+
+```
+
+A lot of outliers were observed, with the huge majority in the lower range.
+
+## Getting the best model per crop and metric
+```{r}
+best_models <- summary_stats_long %>%
+  filter(stat == "mean") %>%
+  group_by(crop, metric) %>%
+  slice_max(order_by = value, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+print(best_models)
+
+write.csv(best_models, "./results/best_models_by_crop_metric_all.csv", row.names = FALSE)
+```
+
+U-Net for wheat and SegFormer for sorghum were the best models overall.
+
+# Ploting bar plots for the best models
+
+## For wheat
+```{r}
+
+df_wheat_unet <- df_no_outliers %>%
+  filter(crop == "wheat", modelname == "U-NET")
+
+# Bar plot: Mean IoU by genotype
+df_genotype_means <- df_wheat_unet %>%
+  group_by(genotype) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop")
+
+max_y <- max(df_genotype_means$mean_IoU, na.rm = TRUE)
+upper <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
+breaks_seq <- seq(0, upper, by = 0.05)
+
+p_genotype <- df_genotype_means %>%
+  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = factor(genotype))) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
+  labs(title = "Mean IoU by Genotype (Wheat, U-NET)", x = "Genotype", y = "Mean IoU") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# Bar plot: Mean IoU by collectiondate
+p_collectiondate <- df_wheat_unet %>%
+  group_by(collectiondate) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = factor(collectiondate), y = mean_IoU, fill = factor(collectiondate))) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
+  labs(title = "Mean IoU by Collection Date (Wheat, U-NET)", x = "Collection Date", y = "Mean IoU") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# Combine plots side-by-side using patchwork and save
+combined <- p_genotype + p_collectiondate + plot_layout(ncol = 2) +
+  plot_annotation(title = "Wheat (U-NET): Mean IoU by Genotype and Collection Date")
+
+print(combined)
+ggsave("./results/mean_IoU_wheat_unet_combined_all.png", plot = combined, width = 12, height = 6, dpi = 700)
+
+```
+
+Genotypes 29 and 36 presented the lowest IoU values.
+The collection dates were similarly performing.
+
+## For sorghum
+```{r}
+
+df_sorghum_segformer <- df_no_outliers %>%
+  filter(crop == "sorghum", modelname == "SegFormer")
+
+# Bar plot: Mean IoU by genotype
+df_genotype_means <- df_sorghum_segformer %>%
+  group_by(genotype) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop")
+
+max_y <- max(df_genotype_means$mean_IoU, na.rm = TRUE)
+upper <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
+breaks_seq <- seq(0, upper, by = 0.05)
+
+p_genotype <- df_genotype_means %>%
+  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = factor(genotype))) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
+  labs(title = "Mean IoU by Genotype (Sorghum, SegFormer)", x = "Genotype", y = "Mean IoU") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+# Bar plot: Mean IoU by collectiondate
+p_collectiondate <- df_sorghum_segformer %>%
+  group_by(collectiondate) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(collectiondate), y = mean_IoU, fill = factor(collectiondate))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Mean IoU by Collection Date (Sorghum, SegFormer)", x = "Collection Date", y = "Mean IoU") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Combine plots side-by-side using patchwork and save
+combined <- p_genotype + p_collectiondate + plot_layout(ncol = 2) +
+  plot_annotation(title = "Sorghum (SegFormer): Mean IoU by Genotype and Collection Date")
+
+print(combined)
+ggsave("./results/mean_IoU_sorghum_segformer_combined_all.png", plot = combined, width = 12, height = 6, dpi = 700)
+
+```
+
+The genotypes presented a great variability in IoU values, with genotypes 11, 15, 25, 39, 44, 65, 68, and 77 showing the lowest performance.
+The collection dates were similarly performing.

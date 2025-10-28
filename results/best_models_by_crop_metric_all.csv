@@ -1,0 +1,11 @@
+"crop","modelname","metric","stat","value"
+"sorghum","SegFormer","Dice","mean",0.960192463840876
+"sorghum","SegFormer","F1","mean",0.960192463968133
+"sorghum","SegFormer","IoU","mean",0.924207886647607
+"sorghum","DeepLabV3Plus","Precision","mean",0.962277218146636
+"sorghum","U-NET","Recall","mean",0.962510396464986
+"wheat","U-NET","Dice","mean",0.941526444383994
+"wheat","U-NET","F1","mean",0.94152644494679
+"wheat","U-NET","IoU","mean",0.890157250916111
+"wheat","U-NET","Precision","mean",0.944871649159563
+"wheat","SegNet","Recall","mean",0.941008332586273
