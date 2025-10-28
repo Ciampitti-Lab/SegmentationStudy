@@ -6,7 +6,7 @@ library(patchwork)
 
 # Data Import
 ```{r}
-df <- read.csv("./results/model_evaluation_results.csv")
+df <- read.csv("./results/model_evaluation_results_allData.csv")
 head(df)
 ```
 
@@ -16,7 +16,7 @@ head(df)
 
 ```{r}
 crops <- c("wheat", "sorghum")
-model_name <- c("DeepLabV3Plus", "U-NET", "SegNet", "SegFormer")
+model_name <- c("DeepLabV3Plus", "U-NET", "SegNet", "SegFormer", "MaskFormer")
 metrics <- c("IoU", "Dice", "Precision", "Recall", "F1")
 ```
 
