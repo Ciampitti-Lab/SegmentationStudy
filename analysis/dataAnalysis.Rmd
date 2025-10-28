@@ -62,7 +62,7 @@ write.csv(summary_stats_long, "./results/summary_statistics_by_crop_model.csv", 
 df_new <- df %>%
   filter(crop == "wheat", modelname == "SegNet")
 
-ggplot(df_new, aes(x = IoU)) +
+ggplot(df_new, aes(x = Recall)) +
   geom_histogram(binwidth = 0.05, fill = "blue", color = "black", alpha = 0.7) +
   labs(title = "Distribution of Model IoU", x = "IoU", y = "Frequency") +
   theme_minimal()
