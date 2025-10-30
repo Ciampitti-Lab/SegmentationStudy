@@ -1,11 +1,11 @@
-Model, Crop, Training Time, Number of Parameters, Number of Epochs, Model File Size, Inference Time (GPU)
-DeepLabV3Plus,Wheat,89min,13M347K,16,52MB,0.1018s
-DeepLabV3Plus,Sorghum,147min,13M347K,17,52MB,0.1097s
-U-Net,Wheat,110min,9M416K,10,36MB,0.232s
-U-Net,Sorghum,374min,9M416K,15,36MB,0.311s
-SegFormer,Wheat,61min,5M125K,12,20MB,0.0817s
-SegFormer,Sorghum,193min,5M125K,16,20MB,0.0815s
-SegNet,Wheat,530min,29M472K,13,115MB,0.333s
-SegNet,Sorghum,934min,29M472K,13,115MB,0.270s
-MaskFormer,Wheat,299min,43M208K,18,169MB,0.2251s
-MaskFormer,Sorghum,397min,43M208K,15,169MB,0.1741s
+Model, Crop, Training Time, Number of Epochs
+DeepLabV3Plus,Wheat,89min,16
+DeepLabV3Plus,Sorghum,147min,17
+U-Net,Wheat,110min,10
+U-Net,Sorghum,374min,15
+SegFormer,Wheat,61min,12
+SegFormer,Sorghum,193min,16
+SegNet,Wheat,530min,13
+SegNet,Sorghum,934min,13
+MaskFormer,Wheat,299min,18
+MaskFormer,Sorghum,397min,15

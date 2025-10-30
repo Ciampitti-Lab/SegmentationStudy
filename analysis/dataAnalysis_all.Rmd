@@ -129,96 +129,308 @@ U-Net for wheat and SegFormer for sorghum were the best models overall.
 
 # Ploting bar plots for the best models
 
+```{r}
+purdue_colors <- c(
+  "black" = "#000000",
+  "gold" = "#CEB888",
+  "white" = "#FFFFFF",
+  "steel" = "#555960"
+)
+# For more categories, use gold and black alternately, or use a custom palette:
+purdue_palette <- c("#CEB888", "#555960", "#B6A76A", "#7A6A53", "#F3E5AB", "#A8996E", "#6E6E6E", "#E1C16E")
+```
+
 ## For wheat
 ```{r}
 
 df_wheat_unet <- df_no_outliers %>%
   filter(crop == "wheat", modelname == "U-NET")
 
-# Bar plot: Mean IoU by genotype
-df_genotype_means <- df_wheat_unet %>%
+# Bar plot: Mean IoU by genotype (use SD for error bars)
+df_genotype_stats <- df_wheat_unet %>%
   group_by(genotype) %>%
-  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop")
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE),
+            sd = sd(IoU, na.rm = TRUE),
+            n = sum(!is.na(IoU)),
+            lower = pmax(0, mean_IoU - sd),
+            upper = mean_IoU + sd,
+            .groups = "drop")
 
-max_y <- max(df_genotype_means$mean_IoU, na.rm = TRUE)
-upper <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
-breaks_seq <- seq(0, upper, by = 0.05)
+max_y <- max(df_genotype_stats$upper, na.rm = TRUE)
+upper_lim <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
+breaks_seq <- seq(0, upper_lim, by = 0.05)
 
-p_genotype <- df_genotype_means %>%
+p_genotype <- df_genotype_stats %>%
   ggplot(aes(x = factor(genotype), y = mean_IoU, fill = factor(genotype))) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
-  labs(title = "Mean IoU by Genotype (Wheat, U-NET)", x = "Genotype", y = "Mean IoU") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  geom_col(color = purdue_colors["black"], width = 0.7, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(values = rep(purdue_palette, length.out = nrow(df_genotype_stats))) +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper_lim), expand = c(0, 0.02)) +
+  labs(title = "Genotype", x = "Genotype", y = "Mean IoU") +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
 
-# Bar plot: Mean IoU by collectiondate
-p_collectiondate <- df_wheat_unet %>%
+print(p_genotype)
+
+df_date_stats <- df_wheat_unet %>%
   group_by(collectiondate) %>%
-  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop") %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE),
+            sd = sd(IoU, na.rm = TRUE),
+            n = sum(!is.na(IoU)),
+            lower = pmax(0, mean_IoU - sd),
+            upper = mean_IoU + sd,
+            .groups = "drop")
+
+# Use same y-scale as genotype plot
+max_y_date <- max(df_date_stats$upper, na.rm = TRUE)
+upper_lim <- ifelse(is.finite(max(df_genotype_stats$upper, max_y_date)), ceiling(max(df_genotype_stats$upper, max_y_date) * 20) / 20, 1)
+breaks_seq <- seq(0, upper_lim, by = 0.05)
+
+p_collectiondate <- df_date_stats %>%
   ggplot(aes(x = factor(collectiondate), y = mean_IoU, fill = factor(collectiondate))) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
-  labs(title = "Mean IoU by Collection Date (Wheat, U-NET)", x = "Collection Date", y = "Mean IoU") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  geom_col(color = purdue_colors["black"], width = 0.7, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(values = rep(purdue_palette, length.out = nrow(df_date_stats))) +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper_lim), expand = c(0, 0.02)) +
+  labs(title = "Collection Date", x = "Collection Date", y = "Mean IoU") +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_collectiondate)
 
 # Combine plots side-by-side using patchwork and save
 combined <- p_genotype + p_collectiondate + plot_layout(ncol = 2) +
-  plot_annotation(title = "Wheat (U-NET): Mean IoU by Genotype and Collection Date")
+  plot_annotation(
+    title = "Wheat (U-NET): Mean IoU by Genotype and Collection Date",
+    theme = theme(
+      plot.title = element_text(color = purdue_colors["black"], size = 20, face = "bold", hjust = 0.5),
+      plot.background = element_rect(fill = purdue_colors["white"], color = NA)
+    )
+  )
 
 print(combined)
-ggsave("./results/mean_IoU_wheat_unet_combined_all.png", plot = combined, width = 12, height = 6, dpi = 700)
+ggsave("./results/mean_IoU_wheat_unet_combined_all.png", plot = combined, width = 20, height = 6, dpi = 700)
 
 ```
 
-Genotypes 29 and 36 presented the lowest IoU values.
-The collection dates were similarly performing.
-
-## For sorghum
+### For sorghum
 ```{r}
 
 df_sorghum_segformer <- df_no_outliers %>%
   filter(crop == "sorghum", modelname == "SegFormer")
 
-# Bar plot: Mean IoU by genotype
-df_genotype_means <- df_sorghum_segformer %>%
+# Bar plot: Mean IoU by genotype (use SD for error bars)
+df_genotype_stats <- df_sorghum_segformer %>%
   group_by(genotype) %>%
-  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop")
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE),
+            sd = sd(IoU, na.rm = TRUE),
+            n = sum(!is.na(IoU)),
+            lower = pmax(0, mean_IoU - sd),
+            upper = mean_IoU + sd,
+            .groups = "drop")
 
-max_y <- max(df_genotype_means$mean_IoU, na.rm = TRUE)
-upper <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
-breaks_seq <- seq(0, upper, by = 0.05)
+max_y <- max(df_genotype_stats$upper, na.rm = TRUE)
+upper_lim <- ifelse(is.finite(max_y), ceiling(max_y * 20) / 20, 1)  # round up to nearest 0.05
+breaks_seq <- seq(0, upper_lim, by = 0.05)
 
-p_genotype <- df_genotype_means %>%
+p_genotype <- df_genotype_stats %>%
   ggplot(aes(x = factor(genotype), y = mean_IoU, fill = factor(genotype))) +
-  geom_bar(stat = "identity") +
-  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper), expand = c(0, 0.02)) +
-  labs(title = "Mean IoU by Genotype (Sorghum, SegFormer)", x = "Genotype", y = "Mean IoU") +
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  geom_col(color = purdue_colors["black"], width = 0.7, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(values = rep(purdue_palette, length.out = nrow(df_genotype_stats))) +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper_lim), expand = c(0, 0.02)) +
+  labs(title = "Genotype", x = "Genotype", y = "Mean IoU") +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
 
-# Bar plot: Mean IoU by collectiondate
-p_collectiondate <- df_sorghum_segformer %>%
+print(p_genotype)
+
+# Bar plot: Mean IoU by collection date (use SD for error bars)
+df_date_stats <- df_sorghum_segformer %>%
   group_by(collectiondate) %>%
-  summarise(mean_IoU = mean(IoU, na.rm = TRUE)) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE),
+            sd = sd(IoU, na.rm = TRUE),
+            n = sum(!is.na(IoU)),
+            lower = pmax(0, mean_IoU - sd),
+            upper = mean_IoU + sd,
+            .groups = "drop")
+
+max_y_date <- max(df_date_stats$upper, na.rm = TRUE)
+upper_lim <- ifelse(is.finite(max(df_genotype_stats$upper, max_y_date)), ceiling(max(df_genotype_stats$upper, max_y_date) * 20) / 20, 1)
+breaks_seq <- seq(0, upper_lim, by = 0.05)
+
+p_collectiondate <- df_date_stats %>%
   ggplot(aes(x = factor(collectiondate), y = mean_IoU, fill = factor(collectiondate))) +
-  geom_bar(stat = "identity") +
-  labs(title = "Mean IoU by Collection Date (Sorghum, SegFormer)", x = "Collection Date", y = "Mean IoU") +
-  theme_minimal() +
-  theme(legend.position = "none")
+  geom_col(color = purdue_colors["black"], width = 0.7, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(values = rep(purdue_palette, length.out = nrow(df_date_stats))) +
+  scale_y_continuous(breaks = breaks_seq, limits = c(0, upper_lim), expand = c(0, 0.02)) +
+  labs(title = "Collection Date", x = "Collection Date", y = "Mean IoU") +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_collectiondate)
 
 # Combine plots side-by-side using patchwork and save
 combined <- p_genotype + p_collectiondate + plot_layout(ncol = 2) +
-  plot_annotation(title = "Sorghum (SegFormer): Mean IoU by Genotype and Collection Date")
+  plot_annotation(title = "Sorghum (SegFormer): Mean IoU by Genotype and Collection Date",
+                  theme = theme(
+                      plot.title = element_text(color = purdue_colors["black"], size = 20, face = "bold", hjust = 0.5),
+                      plot.background = element_rect(fill = purdue_colors["white"], color = NA)
+                    )
+                  )
 
 print(combined)
-ggsave("./results/mean_IoU_sorghum_segformer_combined_all.png", plot = combined, width = 12, height = 6, dpi = 700)
+ggsave("./results/mean_IoU_sorghum_segformer_combined_all.png", plot = combined, width = 20, height = 6, dpi = 700)
 
 ```
 
 The genotypes presented a great variability in IoU values, with genotypes 11, 15, 25, 39, 44, 65, 68, and 77 showing the lowest performance.
 The collection dates were similarly performing.
+
+### Comparing Same individuals
+```{r}
+
+df_individuals <- read.csv("./results/model_evaluation_results_individuals.csv")
+head(df_individuals)
+
+df_no_outliers_individuals <- df_individuals %>%
+    mutate(across(all_of(metrics), ~remove_outliers(.x))) %>%
+    filter(`augmented.` == "no") %>%
+    select(crop, modelname, all_of(metrics), genotype, collectiondate, individual_id) %>%
+    drop_na()
+
+head(df_no_outliers_individuals)
+summary(df_no_outliers_individuals)
+
+# Summarize IoU for each individual across collection dates
+individual_variance <- df_no_outliers_individuals %>%
+  group_by(crop, modelname, genotype, individual_id) %>%
+  summarise(
+    n_dates = n_distinct(collectiondate),
+    mean_IoU = mean(IoU, na.rm = TRUE),
+    sd_IoU = sd(IoU, na.rm = TRUE),
+    min_IoU = min(IoU, na.rm = TRUE),
+    max_IoU = max(IoU, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+print(individual_variance)
+
+# Prepare common x/y axis breaks so both histograms share the same ticks
+binwidth <- 0.01
+
+sd_w <- individual_variance %>% filter(crop == "wheat", modelname == "U-NET") %>% pull(sd_IoU)
+sd_s <- individual_variance %>% filter(crop == "sorghum", modelname == "SegFormer") %>% pull(sd_IoU)
+
+upper_x_raw <- max(c(sd_w, sd_s), na.rm = TRUE)
+upper_x <- ifelse(is.finite(upper_x_raw) && upper_x_raw > 0,
+                  ceiling(upper_x_raw / binwidth) * binwidth,
+                  binwidth)
+breaks_x <- seq(0, upper_x, by = binwidth)
+
+# helper to get bin counts robustly
+bin_counts <- function(vals, breaks) {
+  if (length(vals) == 0) return(rep(0, length(breaks) - 1))
+  as.numeric(table(cut(vals, breaks = breaks, include.lowest = TRUE)))
+}
+counts_w <- bin_counts(sd_w, breaks_x)
+counts_s <- bin_counts(sd_s, breaks_x)
+max_count <- max(c(counts_w, counts_s), na.rm = TRUE)
+y_step <- ifelse(max_count <= 10, 1, ceiling(max_count / 5))
+max_y <- ifelse(is.finite(max_count) && max_count > 0, ceiling(max_count / y_step) * y_step, 1)
+breaks_y <- seq(0, max_y, by = y_step)
+
+# Wheat (U-NET) SD histogram with common ticks
+p_wheat_sd <- individual_variance %>%
+  filter(crop == "wheat", modelname == "U-NET") %>%
+  ggplot(aes(x = sd_IoU)) +
+  geom_histogram(binwidth = binwidth, fill = purdue_colors["steel"], color = purdue_colors["black"], alpha = 0.8) +
+  scale_x_continuous(breaks = breaks_x, limits = c(0, upper_x), expand = c(0, 0.01)) +
+  scale_y_continuous(breaks = breaks_y, limits = c(0, max_y), expand = c(0, 0.02)) +
+  labs(title = "(Wheat, U-NET)", x = "SD of IoU", y = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text = element_text(color = purdue_colors["black"], size = 11),
+    axis.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 14, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.25),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_wheat_sd)
+
+# Sorghum (SegFormer) SD histogram with common ticks
+p_sorghum_sd <- individual_variance %>%
+  filter(crop == "sorghum", modelname == "SegFormer") %>%
+  ggplot(aes(x = sd_IoU)) +
+  geom_histogram(binwidth = binwidth, fill = purdue_colors["steel"], color = purdue_colors["black"], alpha = 0.8) +
+  scale_x_continuous(breaks = breaks_x, limits = c(0, upper_x), expand = c(0, 0.01)) +
+  scale_y_continuous(breaks = breaks_y, limits = c(0, max_y), expand = c(0, 0.02)) +
+  labs(title = "(Sorghum, SegFormer)", x = "SD of IoU", y = "Count") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text = element_text(color = purdue_colors["black"], size = 11),
+    axis.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 14, face = "bold", hjust = 0.5),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.25),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_sorghum_sd)
+
+# Combine side-by-side and save
+combined_sd <- p_wheat_sd + p_sorghum_sd + plot_layout(ncol = 2) +
+  plot_annotation(title = "Distribution of IoU Variance (SD) Across Individuals: Wheat (U-NET) vs Sorghum (SegFormer)",
+                  theme = theme(
+                      plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+                      plot.background = element_rect(fill = purdue_colors["white"], color = NA)
+                    )
+                  )
+
+print(combined_sd)
+
+ggsave("./results/IoU_SD_histograms_wheat_unet_sorghum_segformer_combined.png",
+       plot = combined_sd, width = 14, height = 6, dpi = 600)
+
+```

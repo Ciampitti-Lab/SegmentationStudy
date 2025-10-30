@@ -1,0 +1,21 @@
+Model, Crop, Training Time, Number of Epochs, Number of Augmentations Used
+U-Net,Wheat,110min,10,5
+U-Net,Wheat,327min,13,4
+U-Net,Wheat,122min,20,3
+U-Net,Wheat,49min,12,2
+U-Net,Wheat,33min,16,1
+U-Net,Wheat,109min,19,-10%
+U-Net,Wheat,37min,17,-20%
+U-Net,Wheat,55min,29,-30%
+U-Net,Wheat,29min,18,-40%
+U-Net,Wheat,32min,24,-50%
+SegFormer,Sorghum,193min,16,5
+SegFormer,Sorghum,127min,19,4
+SegFormer,Sorghum,185min,20,3
+SegFormer,Sorghum,119min,23,2
+SegFormer,Sorghum,33min,18,1
+SegFormer,Sorghum,33min,19,-10%
+SegFormer,Sorghum,24min,18,-20%
+SegFormer,Sorghum,24min,21,-30%
+SegFormer,Sorghum,20min,20,-40%
+SegFormer,Sorghum,22min,27,-50%
