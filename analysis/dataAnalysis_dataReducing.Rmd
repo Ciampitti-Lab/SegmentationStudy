@@ -1,0 +1,118 @@
+# Load necessary libraries
+```{r}
+library(tidyverse)
+library(patchwork)
+```
+
+# Load the data
+
+## Inference Metrics
+```{r}
+# Take the old data (trained using 5 new augmented images)
+df <- read.csv("./results/model_evaluation_results_allData.csv")
+df$reduction <- "5"
+df_all <- df %>%
+    filter((modelname == "U-NET" & crop == "wheat") |
+                 (modelname == "SegFormer" & crop == "sorghum")) %>%
+    select(c(crop,collectiondate,genotype,modelname,reduction,IoU,Precision,Recall,F1))
+
+head(df_all)    
+
+# Take new data
+df <- read.csv("./results/model_evaluation_results_dataRemoval.csv")
+
+df_new <- df %>%
+    select(c(crop,collectiondate,genotype,modelname,reduction,IoU,Precision,Recall,F1))
+
+df_combined <- bind_rows(df_all, df_new)
+```
+
+## Training Metrics
+```{r}
+df_metrics <- read.csv("./results/training_metrics_reducing.csv")
+head(df_metrics)
+
+df_metrics_renamed <- df_metrics %>%
+    mutate(Number.of.Augmentations.Used = case_when(
+        Number.of.Augmentations.Used == "5" ~ "+5 Augmentations",
+        Number.of.Augmentations.Used == "4" ~ "+4 Augmentations",
+        Number.of.Augmentations.Used == "3" ~ "+3 Augmentations",
+        Number.of.Augmentations.Used == "2" ~ "+2 Augmentations",
+        Number.of.Augmentations.Used == "1" ~ "Original Data",
+        Number.of.Augmentations.Used == "-10%" ~ "-10% Data",
+        Number.of.Augmentations.Used == "-20%" ~ "-20% Data",
+        Number.of.Augmentations.Used == "-30%" ~ "-30% Data",
+        Number.of.Augmentations.Used == "-40%" ~ "-40% Data",
+        Number.of.Augmentations.Used == "-50%" ~ "-50% Data",
+    ))
+
+head(df_metrics_renamed)
+
+```
+
+# Data Visualization
+
+```{r}
+purdue_colors <- c(
+  "black" = "#000000",
+  "gold" = "#CEB888",
+  "white" = "#FFFFFF",
+  "steel" = "#555960"
+)
+purdue_palette <- c("#CEB888", "#555960", "#B6A76A", "#7A6A53", "#F3E5AB", "#A8996E", "#6E6E6E", "#E1C16E")
+
+```
+
+## Training Metrics
+```{r}
+
+df_metrics_renamed$Number.of.Augmentations.Used <- factor(
+  df_metrics_renamed$Number.of.Augmentations.Used,
+  levels = c("+5 Augmentations", "+4 Augmentations", "+3 Augmentations", "+2 Augmentations", "Original Data",
+             "-10% Data", "-20% Data", "-30% Data", "-40% Data", "-50% Data")
+)
+
+models <- unique(df_metrics_renamed$Model)
+color_vals <- rep(purdue_palette, length.out = length(models))
+names(color_vals) <- models
+label_vals <- case_when(
+    models == "SegFormer" ~ "SegFormer - Sorghum",
+    models == "U-Net"    ~ "U-NET - Wheat",
+    TRUE       ~ models
+)
+
+p1 <- ggplot(df_metrics_renamed, aes(x = Number.of.Augmentations.Used, y = Number.of.Epochs, group = Model, color = Model)) +
+    geom_line(size = 1.5, alpha = 0.85) +
+    geom_point(size = 3, shape = 21, fill = purdue_colors["gold"], color = purdue_colors["black"], stroke = 1.2) +
+    scale_color_manual(values = color_vals, labels = label_vals) +
+    # set y ticks at interval of 1
+    scale_y_continuous(
+      breaks = seq(
+        floor(min(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
+        ceiling(max(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
+        by = 1
+      )
+    ) +
+    labs(title = "Epochs until Convergence for The Different Models/Crops",
+         x = "Data Reduction/Augmentation",
+         y = "Number of Epochs until Convergence") +
+    theme_minimal(base_size = 16) +
+    theme(
+        plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+        panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+        axis.text.x = element_text(angle = 45, hjust = 1, color = purdue_colors["black"], size = 12),
+        axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+        axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+        plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+        legend.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+        legend.text = element_text(color = purdue_colors["black"], size = 12),
+        panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+        panel.grid.minor = element_blank()
+    )
+
+print(p1)
+ggsave("./results/epochs_convergence_dataReducing.png", plot = p1, width = 12, height = 7, dpi = 700)
+```
+
+
+* Plot IoU for different trained models - use violin plots
