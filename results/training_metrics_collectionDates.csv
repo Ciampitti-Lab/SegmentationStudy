@@ -1,11 +1,11 @@
 Model, Crop, Training Time, Number of Epochs, Collection Date
 U-Net,Wheat,186min,15,1
 U-Net,Wheat,38min,13,2
-U-Net,Wheat,,,3
-U-Net,Wheat,,,4
-U-Net,Wheat,,,5
+U-Net,Wheat,55min,18,3
+U-Net,Wheat,71min,24,4
+U-Net,Wheat,41min,17,5
 SegFormer,Sorghum,,,1
 SegFormer,Sorghum,45min,15,2
-SegFormer,Sorghum,,,3
-SegFormer,Sorghum,,,4
-SegFormer,Sorghum,,,5
+SegFormer,Sorghum,54min,19,3
+SegFormer,Sorghum,44min,20,4
+SegFormer,Sorghum,49min,22,5

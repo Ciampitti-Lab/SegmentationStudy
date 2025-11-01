@@ -1,0 +1,33 @@
+# Load necessary libraries
+```{r}
+library(tidyverse)
+```
+
+# Load the data
+```{r}
+df <- read.csv("./results/model_evaluation_crossDate.csv")
+```
+
+# Making the "Correlation" Table
+
+```{r}
+df_corr <- df %>%
+  group_by(crop, train_date, test_date) %>%
+  summarise(mean_IoU = mean(IoU, na.rm = TRUE), .groups = "drop")
+print(df_corr)
+
+correlation_tables <- df_corr %>%
+  pivot_wider(names_from = test_date, values_from = mean_IoU)
+
+# Reorder columns after pivot
+correlation_tables <- correlation_tables %>%
+  select(crop, train_date, `1`, `2`, `3`, `4`, `5`)
+
+for (cr in unique(df_corr$crop)) {
+  cat("\nCorrelation Table for", cr, "\n")
+  print(correlation_tables %>% filter(crop == cr) %>% select(-crop))
+}
+
+write.csv(correlation_tables, "./results/crossDate_correlation_tables.csv", row.names = FALSE)
+
+```

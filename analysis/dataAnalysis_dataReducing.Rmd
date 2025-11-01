@@ -19,12 +19,27 @@ df_all <- df %>%
 head(df_all)    
 
 # Take new data
-df <- read.csv("./results/model_evaluation_results_dataRemoval.csv")
+df <- read.csv("./results/model_evaluation_results_dataRemoval_new.csv")
 
 df_new <- df %>%
     select(c(crop,collectiondate,genotype,modelname,reduction,IoU,Precision,Recall,F1))
 
 df_combined <- bind_rows(df_all, df_new)
+head(df_combined)
+
+df_combined$reduction <- case_when(
+    df_combined$reduction == "5" ~ "+5 Augmentations",
+    df_combined$reduction == "4" ~ "+4 Augmentations",
+    df_combined$reduction == "3" ~ "+3 Augmentations",
+    df_combined$reduction == "2" ~ "+2 Augmentations",
+    df_combined$reduction == "1" ~ "Original Data",
+    df_combined$reduction == "10less" ~ "-10% Data",
+    df_combined$reduction == "20less" ~ "-20% Data",
+    df_combined$reduction == "30less" ~ "-30% Data",
+    df_combined$reduction == "40less" ~ "-40% Data",
+    df_combined$reduction == "50less" ~ "-50% Data",
+)
+head(df_combined)
 ```
 
 ## Training Metrics
@@ -72,47 +87,146 @@ df_metrics_renamed$Number.of.Augmentations.Used <- factor(
              "-10% Data", "-20% Data", "-30% Data", "-40% Data", "-50% Data")
 )
 
-models <- unique(df_metrics_renamed$Model)
-color_vals <- rep(purdue_palette, length.out = length(models))
-names(color_vals) <- models
+models <- unique(as.character(df_metrics_renamed$Model))
+# preserve model order in the data (avoid accidental reordering)
+df_metrics_renamed$Model <- factor(df_metrics_renamed$Model, levels = models)
+
+# map colors explicitly to model names (safe ordering)
+color_vals <- setNames(purdue_palette[seq_len(length(models))], models)
+
+# labels, named to match models
 label_vals <- case_when(
-    models == "SegFormer" ~ "SegFormer - Sorghum",
-    models == "U-Net"    ~ "U-NET - Wheat",
-    TRUE       ~ models
+  models == "SegFormer" ~ "SegFormer - Sorghum",
+  models == "U-Net"    ~ "U-NET - Wheat",
+  TRUE                 ~ models
 )
+names(label_vals) <- models
 
 p1 <- ggplot(df_metrics_renamed, aes(x = Number.of.Augmentations.Used, y = Number.of.Epochs, group = Model, color = Model)) +
-    geom_line(size = 1.5, alpha = 0.85) +
-    geom_point(size = 3, shape = 21, fill = purdue_colors["gold"], color = purdue_colors["black"], stroke = 1.2) +
-    scale_color_manual(values = color_vals, labels = label_vals) +
-    # set y ticks at interval of 1
-    scale_y_continuous(
-      breaks = seq(
-        floor(min(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
-        ceiling(max(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
-        by = 1
-      )
-    ) +
-    labs(title = "Epochs until Convergence for The Different Models/Crops",
-         x = "Data Reduction/Augmentation",
-         y = "Number of Epochs until Convergence") +
-    theme_minimal(base_size = 16) +
-    theme(
-        plot.background = element_rect(fill = purdue_colors["white"], color = NA),
-        panel.background = element_rect(fill = purdue_colors["white"], color = NA),
-        axis.text.x = element_text(angle = 45, hjust = 1, color = purdue_colors["black"], size = 12),
-        axis.text.y = element_text(color = purdue_colors["black"], size = 12),
-        axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
-        plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
-        legend.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
-        legend.text = element_text(color = purdue_colors["black"], size = 12),
-        panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
-        panel.grid.minor = element_blank()
+  geom_line(size = 1.5, alpha = 0.85) +
+  # let color be mapped by the scale so legend and lines match; keep point fill constant
+  geom_point(size = 3, shape = 21, aes(color = Model), fill = purdue_colors["gold"], stroke = 1.2) +
+  scale_color_manual(values = color_vals, labels = label_vals, name = "Model / Crop") +
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
+      ceiling(max(df_metrics_renamed$Number.of.Epochs, na.rm = TRUE)),
+      by = 1
     )
+  ) +
+  labs(title = "Epochs until Convergence for The Different Models/Crops",
+       x = "Data Reduction/Augmentation",
+       y = "Number of Epochs until Convergence") +
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 18, face = "bold", hjust = 0.5),
+    legend.title = element_text(color = purdue_colors["black"], size = 14, face = "bold"),
+    legend.text = element_text(color = purdue_colors["black"], size = 12),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
 
 print(p1)
 ggsave("./results/epochs_convergence_dataReducing.png", plot = p1, width = 12, height = 7, dpi = 700)
 ```
 
+## Removing Outliers
+```{r}
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+    qnt <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm, ...)
+    H <- 1.5 * IQR(x, na.rm = na.rm)
+    y <- x
+    y[x < (qnt[1] - H)] <- NA
+    y[x > (qnt[2] + H)] <- NA
+    return(y)
+}
 
-* Plot IoU for different trained models - use violin plots
+summary(df_combined$IoU)
+
+df_combined <- df_combined %>%
+    mutate(across(IoU, ~remove_outliers(.x))) %>%
+    drop_na()
+
+summary(df_combined$IoU)
+```
+
+## Inference Metrics
+```{r}
+# Compute mean and SD for each reduction group
+df_bar <- df_combined %>%
+  group_by(reduction, crop) %>%
+  summarise(
+    mean_IoU = mean(IoU, na.rm = TRUE),
+    sd_IoU = sd(IoU, na.rm = TRUE),
+    n = n(),
+    lower = pmax(0, mean_IoU - sd_IoU),
+    upper = mean_IoU + sd_IoU,
+    .groups = "drop"
+  )
+print(df_bar)
+
+df_bar <- df_bar %>%
+  mutate(crop = trimws(tolower(as.character(crop))))
+
+df_bar$crop <- factor(df_bar$crop, levels = c("wheat", "sorghum"))
+
+print(unique(df_bar$crop)); print(levels(df_bar$crop))
+
+df_bar$reduction <- factor(
+  df_bar$reduction,
+  levels = c("+5 Augmentations", "+4 Augmentations", "+3 Augmentations", "+2 Augmentations", "Original Data",
+             "-10% Data", "-20% Data", "-30% Data", "-40% Data", "-50% Data")
+)
+
+crops <- unique(as.character(df_bar$crop))
+# preserve model order in the data (avoid accidental reordering)
+df_bar$crop <- factor(df_bar$crop, levels = crops)
+
+# map colors explicitly to model names (safe ordering)
+color_vals <- setNames(purdue_palette[seq_len(length(crops))], crops)
+
+# labels, named to match models
+label_vals <- case_when(
+  crops == "sorghum" ~ "SegFormer - Sorghum",
+  crops == "wheat" ~ "U-NET - Wheat",
+  TRUE                 ~ crops
+)
+names(label_vals) <- crops
+
+# Bar plot with error bars
+p_bar <- ggplot(df_bar, aes(x = reduction, y = mean_IoU, fill = crop)) +
+  geom_bar(stat='identity', position='dodge') +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.8),
+                width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(values = color_vals, labels = label_vals, name = "Crop / Model") +
+  guides(fill = guide_legend(title.position = "top", title.hjust = 0.5)) +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
+  labs(title = "Mean IoU by Data Reduction/Augmentation and Crop - Model",
+       x = "Data Reduction / Augmentation",
+       y = "Mean IoU ± SD") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = purdue_colors["black"], size = 11),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 11),
+    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 16, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    legend.text = element_text(color = purdue_colors["black"], size = 11),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_bar)
+
+ggsave("./results/IoU_bar_by_data_reduction.png", plot = p_bar, width = 12, height = 7, dpi = 600)
+
+```
