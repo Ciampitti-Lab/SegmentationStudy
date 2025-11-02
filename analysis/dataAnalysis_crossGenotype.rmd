@@ -1,0 +1,183 @@
+# Load necessary libraries
+```{r}
+library(tidyverse)
+library(patchwork)
+```
+
+# Remove Outliers Function
+```{r}
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+    qnt <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm, ...)
+    H <- 1.5 * IQR(x, na.rm = na.rm)
+    y <- x
+    y[x < (qnt[1] - H)] <- NA
+    y[x > (qnt[2] + H)] <- NA
+    return(y)
+}
+```
+
+# Load the data
+
+## Original
+```{r}
+
+df_old <- read.csv("./results/model_evaluation_results_allData.csv")
+df_old_filtered <- df_old %>%
+    filter((modelname == "U-NET" & crop == "wheat") |
+                 (modelname == "SegFormer" & crop == "sorghum")) %>%
+    select(c(crop,genotype,modelname,IoU))
+
+df_old_filtered$train_genotype <- "allGenotypes"
+df_old_filtered <- df_old_filtered %>%
+    mutate(across(IoU, ~remove_outliers(.x))) %>%
+    drop_na()
+summary(df_old_filtered)
+```
+
+## Cross Genotype
+```{r}
+
+df <- read.csv("./results/model_evaluation_crossGenotype.csv")
+
+head(df)
+
+df <- df %>%
+    select(c(crop, genotype, modelname, IoU, train_genotype)) %>%
+    mutate(across(IoU, ~remove_outliers(.x))) %>%
+    drop_na()
+head(df)
+summary(df)
+```
+
+## Combine Original and Cross Genotype
+```{r}
+df_combined <- bind_rows(df_old_filtered, df)
+head(df_combined)
+summary(df_combined)
+```
+
+# Making graph
+
+```{r}
+df_bar_genotype <- df_combined %>%
+  group_by(crop, train_genotype, genotype) %>%
+  summarise(
+    mean_IoU = mean(IoU, na.rm = TRUE),
+    sd_IoU = sd(IoU, na.rm = TRUE),
+    n = n(),
+    lower = pmax(0, mean_IoU - sd_IoU),
+    upper = mean_IoU + sd_IoU,
+    .groups = "drop"
+  )
+print(df_bar_genotype)
+
+df_bar_genotype <- df_bar_genotype %>%
+  mutate(crop = trimws(tolower(as.character(crop))))
+
+df_bar_genotype$crop <- factor(df_bar_genotype$crop, levels = c("wheat", "sorghum"))
+
+df_bar_genotype$train_genotype <- factor(
+  df_bar_genotype$train_genotype,
+  levels = c("allGenotypes", "first_half", "second_half")
+)
+
+train_genotypes <- unique(as.character(df_bar_genotype$train_genotype))
+df_bar_genotype$train_genotype <- factor(df_bar_genotype$train_genotype, levels = train_genotypes)
+
+purdue_colors <- c(
+  "black" = "#000000",
+  "gold" = "#CEB888",
+  "steel" = "#555960"
+)
+
+color_vals <- setNames(purdue_colors[seq_len(length(train_genotypes))], train_genotypes)
+
+label_vals <- case_when(
+  train_genotypes == "allGenotypes" ~ "All Genotypes",
+  train_genotypes == "first_half" ~ "First Half",
+  train_genotypes == "second_half" ~ "Second Half",
+  TRUE                 ~ train_genotypes
+)
+names(label_vals) <- train_genotypes
+
+```
+
+## Wheat Plot
+```{r}
+# Create one plot for each combination
+wheat_plot <- df_bar_genotype %>%
+  filter(crop == "wheat", genotype %in% 1:40) %>%
+  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = train_genotype)) +
+  geom_bar(stat='identity', position='dodge')+
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.8),
+                width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(
+    values = color_vals,
+    labels = label_vals,
+    breaks = names(label_vals),
+    name = "Trained on: ") +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
+  labs(
+    title = "Wheat: IoU by Genotype and Genotypes used for training",
+    x = "Genotype",
+    y = "Mean IoU ± SD"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 9),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 11),
+    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 15, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    legend.text = element_text(color = purdue_colors["black"], size = 11),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(wheat_plot)
+ggsave("./results/IoU_bar_genotype_wheat.png", plot = wheat_plot, width = 18, height = 7, dpi = 600)
+```
+
+## Sorghum Plot
+```{r}
+sorghum_plot <- df_bar_genotype %>%
+  filter(crop == "sorghum", genotype %in% 1:80) %>%
+  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = train_genotype)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = purdue_colors["black"], width = 0.7) +
+  geom_errorbar(aes(ymin = lower, ymax = upper),
+                position = position_dodge(width = 0.8),
+                width = 0.2, color = purdue_colors["black"], linewidth = 1) +
+  scale_fill_manual(
+    values = color_vals,
+    labels = label_vals,
+    breaks = names(label_vals),
+    name = "Trained on: ") +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
+  labs(
+    title = "Sorghum: IoU by Genotype and Genotypes used for training",
+    x = "Genotype",
+    y = "Mean IoU ± SD"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 9),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 11),
+    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 15, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    legend.text = element_text(color = purdue_colors["black"], size = 11),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(sorghum_plot)
+ggsave("./results/IoU_bar_genotype_sorghum.png", plot = sorghum_plot, width = 22, height = 7, dpi = 600)
+```
+
