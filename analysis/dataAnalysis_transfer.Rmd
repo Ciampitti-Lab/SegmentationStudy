@@ -1,0 +1,89 @@
+# Load necessary libraries
+
+```{r}
+library(tidyverse)
+```
+
+# Remove Outliers Function
+```{r}
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+    qnt <- quantile(x, probs = c(0.25, 0.75), na.rm = na.rm, ...)
+    H <- 1.5 * IQR(x, na.rm = na.rm)
+    y <- x
+    y[x < (qnt[1] - H)] <- NA
+    y[x > (qnt[2] + H)] <- NA
+    return(y)
+}
+```
+
+# Load the data
+```{r}
+
+df_old <- read_csv("./results/model_evaluation_results_allData.csv")
+summary(df_old)
+df_old_filtered <- df_old %>%
+    filter((modelname == "U-NET" & crop == "wheat") |
+                 (modelname == "SegFormer" & crop == "sorghum")) %>%
+    select(c(crop,collectiondate,genotype,modelname,IoU)) %>%
+    group_by(crop) %>%
+    mutate(across(IoU, ~remove_outliers(.x))) %>%
+    drop_na()%>%
+    ungroup()
+
+df_old_filtered$genotype <- as.numeric(df_old_filtered$genotype)
+df_old_filtered$transfer <- "No"
+head(df_old_filtered)
+summary(df_old_filtered)
+
+data <- read_csv("./results/model_evaluation_transferLearning.csv")
+summary(data)
+
+data_filtered <- data %>%
+    filter((modelname == "U-NET" & crop == "wheat") |
+                 (modelname == "SegFormer" & crop == "sorghum")) %>%
+    select(c(crop,collectiondate,genotype,modelname,IoU)) %>%
+    group_by(crop) %>%
+    mutate(across(IoU, ~remove_outliers(.x))) %>%
+    drop_na()%>%
+    ungroup()
+data_filtered$genotype <- as.numeric(data_filtered$genotype)
+data_filtered$transfer <- "Yes"
+head(data_filtered)
+summary(data_filtered)
+
+df_combined <- bind_rows(df_old_filtered, data_filtered)
+```
+
+# Results Graph
+```{r}
+# Results Graph - Violin plot comparing IoU by crop with/without transfer
+df_plot <- df_combined %>%
+  mutate(
+    crop = trimws(tolower(as.character(crop))),
+    crop = factor(crop, levels = c("wheat", "sorghum")),
+    transfer = factor(transfer, levels = c("No", "Yes"))
+  )
+
+purdue_colors <- c(
+  "No"  = "#CEB888",  # gold-ish for No transfer
+  "Yes" = "#555960"   # steel for Transfer
+)
+
+violin_plot <- ggplot(df_plot, aes(x = crop, y = IoU, fill = transfer, group = interaction(crop, transfer))) +
+  geom_violin(position = position_dodge(width = 0.9), width = 0.8, trim = FALSE, alpha = 0.9) +
+  geom_boxplot(width = 0.12, position = position_dodge(width = 0.9), outlier.size = 0.6, alpha = 0.95) +
+  scale_fill_manual(values = purdue_colors, labels = c("No" = "No Transfer", "Yes" = "Transfer"), name = "Transfer") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
+  labs(title = "IoU distributions by Crop— split by Transfer Learning",
+       x = "Crop",
+       y = "IoU") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.x = element_text(face = "bold"),
+    legend.position = "right"
+  )
+
+print(violin_plot)
+ggsave("./results/IoU_violin_transfer.png", plot = violin_plot, width = 8, height = 10, dpi = 600)
+```
