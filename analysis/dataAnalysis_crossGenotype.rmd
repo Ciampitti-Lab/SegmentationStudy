@@ -102,6 +102,138 @@ names(label_vals) <- train_genotypes
 
 ```
 
+## Making Table comparing stats between all and half Trained
+```{r}
+# Pivot to wide format: one row per genotype, columns for each train_genotype
+table_wide <- df_bar_genotype %>%
+  select(crop, genotype, train_genotype, mean_IoU, sd_IoU) %>%
+  pivot_wider(
+    names_from = train_genotype,
+    values_from = c(mean_IoU, sd_IoU)
+  )
+
+# Calculate differences, variance, and standard deviation for each genotype
+table_stats <- table_wide %>%
+  mutate(
+    diff_first_vs_all = mean_IoU_first_half - mean_IoU_allGenotypes,
+    diff_second_vs_all = mean_IoU_second_half - mean_IoU_allGenotypes,
+    var_allGenotypes = (sd_IoU_allGenotypes)^2,
+    var_first_half = (sd_IoU_first_half)^2,
+    var_second_half = (sd_IoU_second_half)^2
+  ) %>%
+  select(
+    crop, genotype,
+    mean_IoU_allGenotypes, mean_IoU_first_half, mean_IoU_second_half,
+    diff_first_vs_all, diff_second_vs_all,
+    var_allGenotypes, var_first_half, var_second_half,
+    sd_IoU_allGenotypes, sd_IoU_first_half, sd_IoU_second_half
+  )
+
+sorghum_1_40 <- table_stats %>%
+  filter(crop == "sorghum", genotype %in% 1:40) %>%
+  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+
+sorghum_41_80 <- table_stats %>%
+  filter(crop == "sorghum", genotype %in% 41:80) %>%
+  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
+
+# For wheat: 1-20 (All vs Second), 21-40 (All vs First)
+wheat_1_20 <- table_stats %>%
+  filter(crop == "wheat", genotype %in% 1:20) %>%
+  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+
+wheat_21_40 <- table_stats %>%
+  filter(crop == "wheat", genotype %in% 21:40) %>%
+  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
+
+# Summarize for each subgroup
+summary_table <- tibble(
+  group = c(
+    "sorghum_1_40_All_vs_Second",
+    "sorghum_41_80_All_vs_First",
+    "wheat_1_20_All_vs_Second",
+    "wheat_21_40_All_vs_First"
+  ),
+  mean_diff = c(
+    mean(sorghum_1_40$diff, na.rm = TRUE),
+    mean(sorghum_41_80$diff, na.rm = TRUE),
+    mean(wheat_1_20$diff, na.rm = TRUE),
+    mean(wheat_21_40$diff, na.rm = TRUE)
+  ),
+  variance = c(
+    var(sorghum_1_40$diff, na.rm = TRUE),
+    var(sorghum_41_80$diff, na.rm = TRUE),
+    var(wheat_1_20$diff, na.rm = TRUE),
+    var(wheat_21_40$diff, na.rm = TRUE)
+  ),
+  std_deviation = c(
+    sd(sorghum_1_40$diff, na.rm = TRUE),
+    sd(sorghum_41_80$diff, na.rm = TRUE),
+    sd(wheat_1_20$diff, na.rm = TRUE),
+    sd(wheat_21_40$diff, na.rm = TRUE)
+  )
+)
+
+print(summary_table)
+# ...existing code...
+
+# For sorghum: 1-40 (All vs Second), 41-80 (All vs First)
+sorghum_1_40 <- table_stats %>%
+  filter(crop == "sorghum", genotype %in% 1:40) %>%
+  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+
+sorghum_41_80 <- table_stats %>%
+  filter(crop == "sorghum", genotype %in% 41:80) %>%
+  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
+
+# For wheat: 1-20 (All vs Second), 21-40 (All vs First)
+wheat_1_20 <- table_stats %>%
+  filter(crop == "wheat", genotype %in% 1:20) %>%
+  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+
+wheat_21_40 <- table_stats %>%
+  filter(crop == "wheat", genotype %in% 21:40) %>%
+  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
+
+# Summarize for each subgroup
+summary_table <- tibble(
+  group = c(
+    "sorghum_1_40_All_vs_Second",
+    "sorghum_41_80_All_vs_First",
+    "wheat_1_20_All_vs_Second",
+    "wheat_21_40_All_vs_First"
+  ),
+  mean_diff = c(
+    mean(sorghum_1_40$diff, na.rm = TRUE),
+    mean(sorghum_41_80$diff, na.rm = TRUE),
+    mean(wheat_1_20$diff, na.rm = TRUE),
+    mean(wheat_21_40$diff, na.rm = TRUE)
+  ),
+  max = c(
+    max(sorghum_1_40$diff, na.rm = TRUE),
+    max(sorghum_41_80$diff, na.rm = TRUE),
+    max(wheat_1_20$diff, na.rm = TRUE),
+    max(wheat_21_40$diff, na.rm = TRUE)
+  ),
+  min = c(
+    min(sorghum_1_40$diff, na.rm = TRUE),
+    min(sorghum_41_80$diff, na.rm = TRUE),
+    min(wheat_1_20$diff, na.rm = TRUE),
+    min(wheat_21_40$diff, na.rm = TRUE)
+  ),
+  std_deviation = c(
+    sd(sorghum_1_40$diff, na.rm = TRUE),
+    sd(sorghum_41_80$diff, na.rm = TRUE),
+    sd(wheat_1_20$diff, na.rm = TRUE),
+    sd(wheat_21_40$diff, na.rm = TRUE)
+  )
+)
+
+print(summary_table)
+write.csv(summary_table, "./results/genotype_meanIoU_subgroup_comparison.csv", row.names = FALSE)
+
+```
+
 ## Wheat Plot
 ```{r}
 # Create one plot for each combination
