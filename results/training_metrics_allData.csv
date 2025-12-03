@@ -1,11 +1,16 @@
 Model, Crop, Training Time, Number of Epochs
 DeepLabV3Plus,Wheat,89min,16
 DeepLabV3Plus,Sorghum,147min,17
+DeepLabV3Plus,Corn,163min,16
 U-Net,Wheat,110min,10
 U-Net,Sorghum,374min,15
+U-Net,Corn,700min,14
 SegFormer,Wheat,61min,12
 SegFormer,Sorghum,193min,16
+SegFormer,Corn,241min,23
 SegNet,Wheat,530min,13
 SegNet,Sorghum,934min,13
+SegNet,Corn,738min,14
 MaskFormer,Wheat,299min,18
 MaskFormer,Sorghum,397min,15
+MaskFormer,Corn,332min,12
