@@ -6,7 +6,7 @@ library(patchwork)
 
 # Data Import
 ```{r}
-df <- read.csv("./results/model_evaluation_results_allData.csv")
+df <- read.csv("./results/model_evaluation_results.csv")
 head(df)
 ```
 
@@ -15,9 +15,9 @@ head(df)
 ## Setting variables
 
 ```{r}
-crops <- c("wheat", "sorghum")
+crops <- c("wheat", "sorghum", "corn")
 model_name <- c("DeepLabV3Plus", "U-NET", "SegNet", "SegFormer", "MaskFormer")
-metrics <- c("IoU", "Dice", "Precision", "Recall", "F1")
+metrics <- c("IoU", "Precision", "Recall", "F1")
 ```
 
 ## Data summary
@@ -70,6 +70,53 @@ summary_stats_long <- summary_stats %>%
 print(summary_stats_long)
 
 write.csv(summary_stats_long, "./results/summary_statistics_by_crop_model_all.csv", row.names = FALSE)
+```
+
+## Summary Stats Short
+```{r}
+# Short summary table with mean and CV (%) for selected metrics
+summary_short <- df_no_outliers %>%
+  filter(modelname %in% model_name, crop %in% crops) %>%
+  group_by(crop, modelname) %>%
+  summarise(
+    IoUNew = mean(IoU, na.rm = TRUE),
+    IoUCV = (sd(IoU, na.rm = TRUE) / mean(IoU, na.rm = TRUE)) * 100,
+    PrecisionNew = mean(Precision, na.rm = TRUE),
+    PrecisionCV = (sd(Precision, na.rm = TRUE) / mean(Precision, na.rm = TRUE)) * 100,
+    RecallNew = mean(Recall, na.rm = TRUE),
+    RecallCV = (sd(Recall, na.rm = TRUE) / mean(Recall, na.rm = TRUE)) * 100,
+    F1New = mean(F1, na.rm = TRUE),
+    F1CV = (sd(F1, na.rm = TRUE) / mean(F1, na.rm = TRUE)) * 100,
+    .groups = "drop"
+  )
+  select(
+    Crop      = crop,
+    Model     = modelname,
+    IoUNew,
+    IoUCV,
+    PrecisionNew,
+    PrecisionCV,
+    RecallNew,
+    RecallCV,
+    F1New,
+    F1CV
+  ) %>%
+  # rounding for presentation
+  mutate(
+    IoUNew = round(IoUNew, 3),
+    PrecisionNew = round(PrecisionNew, 3),
+    RecallNew = round(RecallNew, 3),
+    F1New = round(F1New, 3),
+    IoUCV = round(IoUCV, 2),
+    PrecisionCV = round(PrecisionCV, 2),
+    RecallCV = round(RecallCV, 2),
+    F1CV = round(F1CV, 2)
+  ) %>%
+  arrange(Crop, Model)
+
+# Print and save
+print(summary_short)
+write.csv(summary_short, "./results/summary_stats_short_by_crop_model.csv", row.names = FALSE)
 ```
 
 ## Plotting distributions
