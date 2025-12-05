@@ -481,3 +481,159 @@ ggsave("./results/IoU_SD_histograms_wheat_unet_sorghum_segformer_combined.png",
        plot = combined_sd, width = 14, height = 6, dpi = 600)
 
 ```
+
+## Compare genotypes within each crop/model and get min/max mean per metric
+
+```{r}
+# Select the models
+target_models <- tribble(
+  ~crop,     ~modelname,
+  "corn",    "SegFormer",
+  "wheat",   "U-NET",
+  "sorghum", "SegFormer"
+)
+
+# Make sure crop and modelname cases match your df_no_outliers
+df_sel <- df_no_outliers %>%
+  mutate(crop = trimws(tolower(as.character(crop))),
+         modelname = trimws(as.character(modelname))) %>%
+  # keep only selected pairs
+  inner_join(target_models %>% mutate(crop = trimws(tolower(crop))),
+             by = c("crop", "modelname"))
+
+# Compute per-genotype mean, sd and CV (%) for each metric
+df_genotype_mean <- df_sel %>%
+  group_by(crop, modelname, genotype) %>%
+  summarise(
+    IoU_mean = mean(IoU, na.rm = TRUE),
+    Precision_mean = mean(Precision, na.rm = TRUE),
+    Recall_mean = mean(Recall, na.rm = TRUE),
+    F1_mean = mean(F1, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+# Pivot CV columns and compute extremes per crop/model/metric
+metrics_mean <- c("IoU_mean", "Precision_mean", "Recall_mean", "F1_mean")
+
+df_extremes <- df_genotype_mean %>%
+  pivot_longer(cols = all_of(metrics_mean), names_to = "metric", values_to = "Mean") %>%
+  group_by(crop, modelname, metric) %>%
+  summarise(
+    min_mean = if (all(is.na(Mean))) NA_real_ else min(Mean, na.rm = TRUE),
+    min_genotype = if (all(is.na(Mean))) NA else genotype[which.min(replace_na(Mean, Inf))],
+
+    max_mean = if (all(is.na(Mean))) NA_real_ else max(Mean, na.rm = TRUE),
+    max_genotype = if (all(is.na(Mean))) NA else genotype[which.max(replace_na(Mean, -Inf))],
+
+    .groups = "drop"
+  ) %>%
+  # clean metric names for readability
+  mutate(metric = case_when(
+    metric == "IoU_mean" ~ "IoU Mean",
+    metric == "Precision_mean" ~ "Precision Mean",
+    metric == "Recall_mean" ~ "Recall Mean",
+    metric == "F1_mean" ~ "F1 Mean",
+    TRUE ~ metric
+  )) %>%
+  arrange(crop, modelname, metric)
+
+# Round numerical CV columns for presentation
+df_extremes <- df_extremes %>%
+  mutate(
+    min_mean = round(min_mean, 2),
+    max_mean = round(max_mean, 2)
+  )
+
+# Print and save
+print(df_extremes)
+write.csv(df_extremes, "./results/genotype_mean_extremes_by_crop_model.csv", row.names = FALSE)
+```
+
+## Mean IoU by crop per collection date (grouped bar chart with error bars)
+
+```{r}
+# Select the models
+target_models <- tribble(
+  ~crop,     ~modelname,
+  "corn",    "SegFormer",
+  "wheat",   "U-NET",
+  "sorghum", "SegFormer"
+)
+
+# Ensure collectiondate is a character and ordered 1..6
+df_sel_dates <- df_no_outliers %>%
+  mutate(crop = trimws(tolower(as.character(crop))),
+         modelname = trimws(as.character(modelname))) %>%
+  # keep only selected pairs
+  inner_join(target_models %>% mutate(crop = trimws(tolower(crop))),
+             by = c("crop", "modelname")) %>%
+  mutate(collectiondate = as.character(collectiondate),
+         collectiondate = trimws(collectiondate))
+
+df_summary_date <- df_sel_dates %>%
+  group_by(crop, collectiondate) %>%
+  summarise(
+    mean_IoU = mean(IoU, na.rm = TRUE),
+    sd_IoU   = sd(IoU, na.rm = TRUE),
+    n        = sum(!is.na(IoU)),
+    lower    = pmax(0, mean_IoU - sd_IoU),
+    upper    = pmin(1, mean_IoU + sd_IoU),
+    .groups = "drop"
+  )
+
+# Make sure crop is a factor with correct levels for color mapping
+df_summary_date$crop <- factor(df_summary_date$crop, levels = c("wheat", "sorghum", "corn"))
+
+# Order collection dates including 6
+df_summary_date$collectiondate <- factor(df_summary_date$collectiondate, levels = c("1","2","3","4","5","6"))
+
+crops <- unique(as.character(df_summary_date$crop))
+
+purdue_colors <- c(
+  "black" = "#000000",
+  "gold" = "#CEB888",
+  "steel" = "#555960"
+)
+
+color_vals <- setNames(purdue_colors[seq_len(length(crops))], crops)
+
+label_vals <- case_when(
+  crops == "wheat" ~ "Wheat (U-NET)",
+  crops == "sorghum" ~ "Sorghum (SegFormer)",
+  crops == "corn" ~ "Corn (SegFormer)",
+  TRUE                 ~ crops
+)
+names(label_vals) <- crops
+# Dodge width
+dodge_w <- 0.8
+
+p_date_crop <- ggplot(df_summary_date, aes(x = collectiondate, y = mean_IoU, color = crop, group = crop)) +
+  geom_line(size = 2, alpha = 0.9) +
+  geom_point(size = 3.5, shape = 21, fill = "black", stroke = 1.5) +
+  scale_color_manual(
+    values = color_vals,
+    labels = label_vals,
+    breaks = names(label_vals),
+    name = "Crop") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
+  labs(x = "Collection Date",
+       y = "Mean IoU ± SD") +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
+    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
+    axis.text.x = element_text(color = purdue_colors["black"], size = 12),
+    axis.text.y = element_text(color = purdue_colors["black"], size = 12),
+    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
+    plot.title = element_text(color = purdue_colors["black"], size = 16, face = "bold", hjust = 0.5),
+    legend.position = "right",
+    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
+    legend.text = element_text(color = purdue_colors["black"], size = 11),
+    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
+    panel.grid.minor = element_blank()
+  )
+
+print(p_date_crop)
+ggsave("./results/mean_IoU_by_crop_by_date.png", plot = p_date_crop, width = 8, height = 10, dpi = 600)
+```

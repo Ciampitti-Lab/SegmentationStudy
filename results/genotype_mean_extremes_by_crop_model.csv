@@ -1,0 +1,13 @@
+crop,modelname,metric,min_mean,min_genotype,max_mean,max_genotype
+corn,SegFormer,F1 Mean,0.91,30,0.97,122
+corn,SegFormer,IoU Mean,0.83,30,0.93,122
+corn,SegFormer,Precision Mean,0.9,46,0.97,86
+corn,SegFormer,Recall Mean,0.89,44,0.98,71
+sorghum,SegFormer,F1 Mean,0.92,39,0.98,80
+sorghum,SegFormer,IoU Mean,0.85,39,0.96,80
+sorghum,SegFormer,Precision Mean,0.9,26,0.98,42
+sorghum,SegFormer,Recall Mean,0.91,27,0.98,80
+wheat,U-NET,F1 Mean,0.9,29,0.96,40
+wheat,U-NET,IoU Mean,0.83,29,0.92,40
+wheat,U-NET,Precision Mean,0.9,38,0.96,30
+wheat,U-NET,Recall Mean,0.87,29,0.96,40
