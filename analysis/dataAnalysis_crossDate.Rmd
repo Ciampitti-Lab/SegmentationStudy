@@ -5,7 +5,7 @@ library(tidyverse)
 
 # Load the data
 ```{r}
-df <- read.csv("./results/model_evaluation_crossDate_wheat.csv")
+df <- read.csv("./results/model_evaluation_crossDate_corn.csv")
 ```
 
 # Making the "Correlation" Table
@@ -21,13 +21,13 @@ correlation_tables <- df_corr %>%
 
 # Reorder columns after pivot
 correlation_tables <- correlation_tables %>%
-  select(crop, train_date, `1`, `2`, `3`, `4`, `5`)
+  select(crop, train_date, `1`, `2`, `3`, `4`, `5`, `6`)
 
 for (cr in unique(df_corr$crop)) {
   cat("\nCorrelation Table for", cr, "\n")
   print(correlation_tables %>% filter(crop == cr) %>% select(-crop))
 }
 
-write.csv(correlation_tables, "./results/crossDate_correlation_tables.csv", row.names = FALSE)
+write.csv(correlation_tables, "./results/crossDate_corn.csv", row.names = FALSE)
 
 ```
