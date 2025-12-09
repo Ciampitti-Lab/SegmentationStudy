@@ -18,298 +18,128 @@ remove_outliers <- function(x, na.rm = TRUE, ...) {
 
 # Load the data
 
-## Original
-```{r}
-
-df_old <- read.csv("./results/model_evaluation_results_allData.csv")
-df_old_filtered <- df_old %>%
-    filter((modelname == "U-NET" & crop == "wheat") |
-                 (modelname == "SegFormer" & crop == "sorghum")) %>%
-    select(c(crop,genotype,modelname,IoU))
-
-df_old_filtered$train_genotype <- "allGenotypes"
-df_old_filtered <- df_old_filtered %>%
-    mutate(across(IoU, ~remove_outliers(.x))) %>%
-    drop_na()
-summary(df_old_filtered)
-```
-
-## Cross Genotype
 ```{r}
 
 df <- read.csv("./results/model_evaluation_crossGenotype.csv")
 
-head(df)
-
-df <- df %>%
-    select(c(crop, genotype, modelname, IoU, train_genotype)) %>%
+df_filtered <- df %>%
     mutate(across(IoU, ~remove_outliers(.x))) %>%
     drop_na()
-head(df)
-summary(df)
+summary(df_filtered)
 ```
 
-## Combine Original and Cross Genotype
-```{r}
-df_combined <- bind_rows(df_old_filtered, df)
-head(df_combined)
-summary(df_combined)
-```
-
-# Making graph
+# IoU Difference across Genotypes
 
 ```{r}
-df_bar_genotype <- df_combined %>%
-  group_by(crop, train_genotype, genotype) %>%
+# 0. Quick inspect (optional)
+print("Preview df_filtered:")
+print(head(df_filtered))
+print("train_genotype unique values:")
+print(unique(df_filtered$train_genotype))
+
+# 1. Normalize labels and coerce numeric metrics
+df_clean <- df_filtered %>%
+  mutate(
+    crop = trimws(tolower(as.character(crop))),
+    train_genotype = trimws(tolower(as.character(train_genotype))),
+    test_genotype = as.character(test_genotype),
+    IoU = as.numeric(IoU),
+    Precision = as.numeric(Precision),
+    Recall = as.numeric(Recall),
+    F1 = as.numeric(F1)
+  )
+
+# 2. Aggregate mean per group (in case multiple rows per group)
+df_agg <- df_clean %>%
+  group_by(crop, train_genotype, test_genotype) %>%
   summarise(
     mean_IoU = mean(IoU, na.rm = TRUE),
-    sd_IoU = sd(IoU, na.rm = TRUE),
-    n = n(),
-    lower = pmax(0, mean_IoU - sd_IoU),
-    upper = mean_IoU + sd_IoU,
+    mean_Precision = mean(Precision, na.rm = TRUE),
+    mean_Recall = mean(Recall, na.rm = TRUE),
+    mean_F1 = mean(F1, na.rm = TRUE),
     .groups = "drop"
   )
-print(df_bar_genotype)
 
-df_bar_genotype <- df_bar_genotype %>%
-  mutate(crop = trimws(tolower(as.character(crop))))
+# Show groups with all-NA means (debug)
+bad <- df_agg %>% filter(is.na(mean_IoU) & is.na(mean_Precision) & is.na(mean_Recall) & is.na(mean_F1))
+if (nrow(bad) > 0) {
+  message("Warning: some (crop,train_genotype,test_genotype) groups have all metrics NA. Example:")
+  print(head(bad, 10))
+}
 
-df_bar_genotype$crop <- factor(df_bar_genotype$crop, levels = c("wheat", "sorghum"))
-
-df_bar_genotype$train_genotype <- factor(
-  df_bar_genotype$train_genotype,
-  levels = c("allGenotypes", "first_half", "second_half")
-)
-
-train_genotypes <- unique(as.character(df_bar_genotype$train_genotype))
-df_bar_genotype$train_genotype <- factor(df_bar_genotype$train_genotype, levels = train_genotypes)
-
-purdue_colors <- c(
-  "black" = "#000000",
-  "gold" = "#CEB888",
-  "steel" = "#555960"
-)
-
-color_vals <- setNames(purdue_colors[seq_len(length(train_genotypes))], train_genotypes)
-
-label_vals <- case_when(
-  train_genotypes == "allGenotypes" ~ "All Genotypes",
-  train_genotypes == "first_half" ~ "First Half",
-  train_genotypes == "second_half" ~ "Second Half",
-  TRUE                 ~ train_genotypes
-)
-names(label_vals) <- train_genotypes
-
-```
-
-## Making Table comparing stats between all and half Trained
-```{r}
-# Pivot to wide format: one row per genotype, columns for each train_genotype
-table_wide <- df_bar_genotype %>%
-  select(crop, genotype, train_genotype, mean_IoU, sd_IoU) %>%
+# 3. Pivot wider so each train_genotype becomes columns for each metric
+# We'll create separate wide tables per metric and then join, or pivot all at once with names_sep.
+df_wide_all <- df_agg %>%
   pivot_wider(
+    id_cols = c(crop, test_genotype),
     names_from = train_genotype,
-    values_from = c(mean_IoU, sd_IoU)
+    values_from = c(mean_IoU, mean_Precision, mean_Recall, mean_F1),
+    names_sep = "__"
   )
 
-# Calculate differences, variance, and standard deviation for each genotype
-table_stats <- table_wide %>%
+# Debug: check column names
+print("Columns after pivot:")
+print(names(df_wide_all))
+print("Preview:")
+print(head(df_wide_all))
+
+# 4. Identify actual column names for first_half and second_half (case-insensitive)
+# Expected normalized train_genotype names:
+first_name <- "first_half"
+second_name <- "second_half"
+
+# Build the expected wide column names
+col_first_IoU   <- paste0("mean_IoU__", first_name)
+col_second_IoU  <- paste0("mean_IoU__", second_name)
+col_first_Prec  <- paste0("mean_Precision__", first_name)
+col_second_Prec <- paste0("mean_Precision__", second_name)
+col_first_Rec   <- paste0("mean_Recall__", first_name)
+col_second_Rec  <- paste0("mean_Recall__", second_name)
+col_first_F1    <- paste0("mean_F1__", first_name)
+col_second_F1   <- paste0("mean_F1__", second_name)
+
+# Check presence
+missing_cols <- setdiff(
+  c(col_first_IoU, col_second_IoU, col_first_Prec, col_second_Prec,
+    col_first_Rec, col_second_Rec, col_first_F1, col_second_F1),
+  names(df_wide_all)
+)
+if (length(missing_cols) > 0) {
+  stop("Missing expected pivot columns: ", paste(missing_cols, collapse = ", "),
+       "\nCheck unique(train_genotype) values and adjust expected names accordingly.")
+}
+
+# 5. Compute differences: first_half - second_half for each metric
+df_diff_metrics <- df_wide_all %>%
   mutate(
-    diff_first_vs_all = mean_IoU_first_half - mean_IoU_allGenotypes,
-    diff_second_vs_all = mean_IoU_second_half - mean_IoU_allGenotypes,
-    var_allGenotypes = (sd_IoU_allGenotypes)^2,
-    var_first_half = (sd_IoU_first_half)^2,
-    var_second_half = (sd_IoU_second_half)^2
+    diff_IoU       = as.numeric(.data[[col_first_IoU]]) - as.numeric(.data[[col_second_IoU]]),
+    diff_Precision = as.numeric(.data[[col_first_Prec]]) - as.numeric(.data[[col_second_Prec]]),
+    diff_Recall    = as.numeric(.data[[col_first_Rec]]) - as.numeric(.data[[col_second_Rec]]),
+    diff_F1        = as.numeric(.data[[col_first_F1]]) - as.numeric(.data[[col_second_F1]])
   ) %>%
-  select(
-    crop, genotype,
-    mean_IoU_allGenotypes, mean_IoU_first_half, mean_IoU_second_half,
-    diff_first_vs_all, diff_second_vs_all,
-    var_allGenotypes, var_first_half, var_second_half,
-    sd_IoU_allGenotypes, sd_IoU_first_half, sd_IoU_second_half
-  )
+  select(crop, test_genotype, starts_with("diff_"))
 
-sorghum_1_40 <- table_stats %>%
-  filter(crop == "sorghum", genotype %in% 1:40) %>%
-  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+# Preview differences
+print("Preview differences:")
+print(head(df_diff_metrics, 20))
 
-sorghum_41_80 <- table_stats %>%
-  filter(crop == "sorghum", genotype %in% 41:80) %>%
-  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
+# 6. Compute per-crop summary: mean, sd, n, CV% for each metric difference
+# Pivot longer to compute summaries per metric uniformly
+df_diff_long <- df_diff_metrics %>%
+  pivot_longer(cols = starts_with("diff_"), names_to = "metric", values_to = "diff_value") %>%
+  mutate(metric = sub("^diff_", "", metric))  # remove prefix
 
-# For wheat: 1-20 (All vs Second), 21-40 (All vs First)
-wheat_1_20 <- table_stats %>%
-  filter(crop == "wheat", genotype %in% 1:20) %>%
-  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
+df_summary_by_crop_metric <- df_diff_long %>%
+  group_by(crop, metric) %>%
+  summarise(
+    mean_diff = mean(diff_value, na.rm = TRUE),
+    sd_diff   = sd(diff_value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(crop, metric)
 
-wheat_21_40 <- table_stats %>%
-  filter(crop == "wheat", genotype %in% 21:40) %>%
-  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
-
-# Summarize for each subgroup
-summary_table <- tibble(
-  group = c(
-    "sorghum_1_40_All_vs_Second",
-    "sorghum_41_80_All_vs_First",
-    "wheat_1_20_All_vs_Second",
-    "wheat_21_40_All_vs_First"
-  ),
-  mean_diff = c(
-    mean(sorghum_1_40$diff, na.rm = TRUE),
-    mean(sorghum_41_80$diff, na.rm = TRUE),
-    mean(wheat_1_20$diff, na.rm = TRUE),
-    mean(wheat_21_40$diff, na.rm = TRUE)
-  ),
-  variance = c(
-    var(sorghum_1_40$diff, na.rm = TRUE),
-    var(sorghum_41_80$diff, na.rm = TRUE),
-    var(wheat_1_20$diff, na.rm = TRUE),
-    var(wheat_21_40$diff, na.rm = TRUE)
-  ),
-  std_deviation = c(
-    sd(sorghum_1_40$diff, na.rm = TRUE),
-    sd(sorghum_41_80$diff, na.rm = TRUE),
-    sd(wheat_1_20$diff, na.rm = TRUE),
-    sd(wheat_21_40$diff, na.rm = TRUE)
-  )
-)
-
-print(summary_table)
-# ...existing code...
-
-# For sorghum: 1-40 (All vs Second), 41-80 (All vs First)
-sorghum_1_40 <- table_stats %>%
-  filter(crop == "sorghum", genotype %in% 1:40) %>%
-  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
-
-sorghum_41_80 <- table_stats %>%
-  filter(crop == "sorghum", genotype %in% 41:80) %>%
-  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
-
-# For wheat: 1-20 (All vs Second), 21-40 (All vs First)
-wheat_1_20 <- table_stats %>%
-  filter(crop == "wheat", genotype %in% 1:20) %>%
-  mutate(diff = mean_IoU_second_half - mean_IoU_allGenotypes)
-
-wheat_21_40 <- table_stats %>%
-  filter(crop == "wheat", genotype %in% 21:40) %>%
-  mutate(diff = mean_IoU_first_half - mean_IoU_allGenotypes)
-
-# Summarize for each subgroup
-summary_table <- tibble(
-  group = c(
-    "sorghum_1_40_All_vs_Second",
-    "sorghum_41_80_All_vs_First",
-    "wheat_1_20_All_vs_Second",
-    "wheat_21_40_All_vs_First"
-  ),
-  mean_diff = c(
-    mean(sorghum_1_40$diff, na.rm = TRUE),
-    mean(sorghum_41_80$diff, na.rm = TRUE),
-    mean(wheat_1_20$diff, na.rm = TRUE),
-    mean(wheat_21_40$diff, na.rm = TRUE)
-  ),
-  max = c(
-    max(sorghum_1_40$diff, na.rm = TRUE),
-    max(sorghum_41_80$diff, na.rm = TRUE),
-    max(wheat_1_20$diff, na.rm = TRUE),
-    max(wheat_21_40$diff, na.rm = TRUE)
-  ),
-  min = c(
-    min(sorghum_1_40$diff, na.rm = TRUE),
-    min(sorghum_41_80$diff, na.rm = TRUE),
-    min(wheat_1_20$diff, na.rm = TRUE),
-    min(wheat_21_40$diff, na.rm = TRUE)
-  ),
-  std_deviation = c(
-    sd(sorghum_1_40$diff, na.rm = TRUE),
-    sd(sorghum_41_80$diff, na.rm = TRUE),
-    sd(wheat_1_20$diff, na.rm = TRUE),
-    sd(wheat_21_40$diff, na.rm = TRUE)
-  )
-)
-
-print(summary_table)
-write.csv(summary_table, "./results/genotype_meanIoU_subgroup_comparison.csv", row.names = FALSE)
-
+# Print and save summary
+print("Per-crop metric difference summary:")
+print(df_summary_by_crop_metric)
+write.csv(df_summary_by_crop_metric, "./results/metric_difference_crossGenotype.csv", row.names = FALSE)
 ```
-
-## Wheat Plot
-```{r}
-# Create one plot for each combination
-wheat_plot <- df_bar_genotype %>%
-  filter(crop == "wheat", genotype %in% 1:40) %>%
-  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = train_genotype)) +
-  geom_bar(stat='identity', position='dodge')+
-  geom_errorbar(aes(ymin = lower, ymax = upper),
-                position = position_dodge(width = 0.8),
-                width = 0.2, color = purdue_colors["black"], linewidth = 1) +
-  scale_fill_manual(
-    values = color_vals,
-    labels = label_vals,
-    breaks = names(label_vals),
-    name = "Trained on: ") +
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
-  labs(
-    title = "Wheat: IoU by Genotype and Genotypes used for training",
-    x = "Genotype",
-    y = "Mean IoU ± SD"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
-    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 9),
-    axis.text.y = element_text(color = purdue_colors["black"], size = 11),
-    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
-    plot.title = element_text(color = purdue_colors["black"], size = 15, face = "bold", hjust = 0.5),
-    legend.position = "right",
-    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
-    legend.text = element_text(color = purdue_colors["black"], size = 11),
-    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
-    panel.grid.minor = element_blank()
-  )
-
-print(wheat_plot)
-ggsave("./results/IoU_bar_genotype_wheat.png", plot = wheat_plot, width = 18, height = 7, dpi = 600)
-```
-
-## Sorghum Plot
-```{r}
-sorghum_plot <- df_bar_genotype %>%
-  filter(crop == "sorghum", genotype %in% 1:80) %>%
-  ggplot(aes(x = factor(genotype), y = mean_IoU, fill = train_genotype)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = purdue_colors["black"], width = 0.7) +
-  geom_errorbar(aes(ymin = lower, ymax = upper),
-                position = position_dodge(width = 0.8),
-                width = 0.2, color = purdue_colors["black"], linewidth = 1) +
-  scale_fill_manual(
-    values = color_vals,
-    labels = label_vals,
-    breaks = names(label_vals),
-    name = "Trained on: ") +
-    scale_y_continuous(breaks = scales::pretty_breaks(n = 20), limits = c(0, 1), expand = c(0, 0.01)) +
-  labs(
-    title = "Sorghum: IoU by Genotype and Genotypes used for training",
-    x = "Genotype",
-    y = "Mean IoU ± SD"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.background = element_rect(fill = purdue_colors["white"], color = NA),
-    panel.background = element_rect(fill = purdue_colors["white"], color = NA),
-    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1, color = purdue_colors["black"], size = 9),
-    axis.text.y = element_text(color = purdue_colors["black"], size = 11),
-    axis.title = element_text(color = purdue_colors["black"], size = 13, face = "bold"),
-    plot.title = element_text(color = purdue_colors["black"], size = 15, face = "bold", hjust = 0.5),
-    legend.position = "right",
-    legend.title = element_text(color = purdue_colors["black"], size = 12, face = "bold"),
-    legend.text = element_text(color = purdue_colors["black"], size = 11),
-    panel.grid.major = element_line(color = purdue_colors["gold"], linewidth = 0.3),
-    panel.grid.minor = element_blank()
-  )
-
-print(sorghum_plot)
-ggsave("./results/IoU_bar_genotype_sorghum.png", plot = sorghum_plot, width = 22, height = 7, dpi = 600)
-```
-
