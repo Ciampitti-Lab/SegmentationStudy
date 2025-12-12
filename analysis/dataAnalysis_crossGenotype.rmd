@@ -28,118 +28,89 @@ df_filtered <- df %>%
 summary(df_filtered)
 ```
 
-# IoU Difference across Genotypes
+# Metric values across Genotypes
 
 ```{r}
-# 0. Quick inspect (optional)
-print("Preview df_filtered:")
-print(head(df_filtered))
-print("train_genotype unique values:")
-print(unique(df_filtered$train_genotype))
+## Compute mean metrics per train/test genotype and save as CSVs
 
-# 1. Normalize labels and coerce numeric metrics
-df_clean <- df_filtered %>%
-  mutate(
-    crop = trimws(tolower(as.character(crop))),
-    train_genotype = trimws(tolower(as.character(train_genotype))),
-    test_genotype = as.character(test_genotype),
-    IoU = as.numeric(IoU),
-    Precision = as.numeric(Precision),
-    Recall = as.numeric(Recall),
-    F1 = as.numeric(F1)
-  )
+# Ensure test_genotype is character for pivoting
+df_filtered <- df_filtered %>%
+    mutate(test_genotype = as.character(test_genotype))
 
-# 2. Aggregate mean per group (in case multiple rows per group)
-df_agg <- df_clean %>%
-  group_by(crop, train_genotype, test_genotype) %>%
-  summarise(
-    mean_IoU = mean(IoU, na.rm = TRUE),
-    mean_Precision = mean(Precision, na.rm = TRUE),
-    mean_Recall = mean(Recall, na.rm = TRUE),
-    mean_F1 = mean(F1, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-# Show groups with all-NA means (debug)
-bad <- df_agg %>% filter(is.na(mean_IoU) & is.na(mean_Precision) & is.na(mean_Recall) & is.na(mean_F1))
-if (nrow(bad) > 0) {
-  message("Warning: some (crop,train_genotype,test_genotype) groups have all metrics NA. Example:")
-  print(head(bad, 10))
-}
-
-# 3. Pivot wider so each train_genotype becomes columns for each metric
-# We'll create separate wide tables per metric and then join, or pivot all at once with names_sep.
-df_wide_all <- df_agg %>%
-  pivot_wider(
-    id_cols = c(crop, test_genotype),
-    names_from = train_genotype,
-    values_from = c(mean_IoU, mean_Precision, mean_Recall, mean_F1),
-    names_sep = "__"
-  )
-
-# Debug: check column names
-print("Columns after pivot:")
-print(names(df_wide_all))
-print("Preview:")
-print(head(df_wide_all))
-
-# 4. Identify actual column names for first_half and second_half (case-insensitive)
-# Expected normalized train_genotype names:
-first_name <- "first_half"
-second_name <- "second_half"
-
-# Build the expected wide column names
-col_first_IoU   <- paste0("mean_IoU__", first_name)
-col_second_IoU  <- paste0("mean_IoU__", second_name)
-col_first_Prec  <- paste0("mean_Precision__", first_name)
-col_second_Prec <- paste0("mean_Precision__", second_name)
-col_first_Rec   <- paste0("mean_Recall__", first_name)
-col_second_Rec  <- paste0("mean_Recall__", second_name)
-col_first_F1    <- paste0("mean_F1__", first_name)
-col_second_F1   <- paste0("mean_F1__", second_name)
-
-# Check presence
-missing_cols <- setdiff(
-  c(col_first_IoU, col_second_IoU, col_first_Prec, col_second_Prec,
-    col_first_Rec, col_second_Rec, col_first_F1, col_second_F1),
-  names(df_wide_all)
+# Define genotype order lists (use lowercase crop names)
+genotype_lists <- list(
+    first_half_wheat = as.character(c(25, 26, 27, 29, 33, 34, 35, 36, 37, 38, 39)),
+    second_half_wheat = as.character(c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                                         11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+                                         21, 22, 23, 24, 28, 30, 31, 32, 40)),
+    first_half_sorghum = as.character(c(1, 3, 8, 11, 14, 15, 18, 20, 23, 25, 26, 27, 28,
+                                                     29, 37, 39, 44, 46, 47, 49, 50, 51, 52, 55, 64,
+                                                     65, 67, 68, 72, 76, 77, 79)),
+    second_half_sorghum = as.character(c(2, 4, 5, 6, 7, 9, 10, 12, 13, 16,
+                                                      17, 19, 21, 22, 24, 30, 31, 32, 33, 34, 35, 36,
+                                                      38, 40, 41, 42, 43, 45, 48, 53, 54, 56, 57, 58,
+                                                      59, 60, 61, 62, 63, 66, 69, 70, 71, 73, 74,
+                                                      75, 78, 80)),
+    first_half_corn = as.character(c(103, 122, 120, 37, 50, 21, 43, 157, 101, 130, 106,
+                                                89, 39, 66, 30, 113, 35, 83, 117, 158, 134, 148, 15,
+                                                91, 111, 121, 24, 159, 3, 156, 93, 128, 8, 94, 108,
+                                                86, 26, 112, 110, 129, 84, 118, 78, 23, 95, 14, 53,
+                                                38, 42, 32, 136, 36, 34, 116, 25, 160, 52, 4, 140,
+                                                145, 58, 138, 33, 152, 63, 153, 61, 124, 27, 97, 72,
+                                                79, 146, 150, 7, 10, 81, 46, 9, 127)),
+    second_half_corn = as.character(c( 1, 2, 5, 6, 11, 12, 13, 16, 17, 18, 19, 20, 22, 28,
+                                                29, 31, 40, 41, 44, 45, 47, 48, 49, 51, 54, 55, 56,
+                                                57, 59, 60, 62, 64, 65, 67, 68, 69, 70, 71, 73, 74,
+                                                75, 76, 77, 80, 82, 85, 87, 88, 90, 92, 96, 98, 99,
+                                                100, 102, 104, 105, 107, 109, 114, 115, 119, 123,
+                                                125, 126, 131, 132, 133, 135, 137, 139, 141, 142,
+                                                143, 144, 147, 149, 151, 154, 155))
 )
-if (length(missing_cols) > 0) {
-  stop("Missing expected pivot columns: ", paste(missing_cols, collapse = ", "),
-       "\nCheck unique(train_genotype) values and adjust expected names accordingly.")
-}
 
-# 5. Compute differences: first_half - second_half for each metric
-df_diff_metrics <- df_wide_all %>%
-  mutate(
-    diff_IoU       = as.numeric(.data[[col_first_IoU]]) - as.numeric(.data[[col_second_IoU]]),
-    diff_Precision = as.numeric(.data[[col_first_Prec]]) - as.numeric(.data[[col_second_Prec]]),
-    diff_Recall    = as.numeric(.data[[col_first_Rec]]) - as.numeric(.data[[col_second_Rec]]),
-    diff_F1        = as.numeric(.data[[col_first_F1]]) - as.numeric(.data[[col_second_F1]])
-  ) %>%
-  select(crop, test_genotype, starts_with("diff_"))
+# Summarise mean metrics by crop / train_genotype / test_genotype
+df_summary <- df_filtered %>%
+    group_by(crop, train_genotype, test_genotype) %>%
+    summarise(
+        mean_IoU = mean(IoU, na.rm = TRUE),
+        mean_Precision = mean(Precision, na.rm = TRUE),
+        mean_Recall = mean(Recall, na.rm = TRUE),
+        mean_F1 = mean(F1, na.rm = TRUE),
+        .groups = "drop"
+    )
 
-# Preview differences
-print("Preview differences:")
-print(head(df_diff_metrics, 20))
+metrics <- c("mean_IoU", "mean_Precision", "mean_Recall", "mean_F1")
 
-# 6. Compute per-crop summary: mean, sd, n, CV% for each metric difference
-# Pivot longer to compute summaries per metric uniformly
-df_diff_long <- df_diff_metrics %>%
-  pivot_longer(cols = starts_with("diff_"), names_to = "metric", values_to = "diff_value") %>%
-  mutate(metric = sub("^diff_", "", metric))  # remove prefix
+# --- Aggregate by halves (First / Second) and save combined CSV
+# Build mapping table for test genotypes -> halves per crop
+half_map <- bind_rows(
+    tibble(crop = "Wheat", genotype = genotype_lists$first_half_wheat, half = "First Half"),
+    tibble(crop = "Wheat", genotype = genotype_lists$second_half_wheat, half = "Second Half"),
+    tibble(crop = "Sorghum", genotype = genotype_lists$first_half_sorghum, half = "First Half"),
+    tibble(crop = "Sorghum", genotype = genotype_lists$second_half_sorghum, half = "Second Half"),
+    tibble(crop = "Corn", genotype = genotype_lists$first_half_corn, half = "First Half"),
+    tibble(crop = "Corn", genotype = genotype_lists$second_half_corn, half = "Second Half")
+)
 
-df_summary_by_crop_metric <- df_diff_long %>%
-  group_by(crop, metric) %>%
-  summarise(
-    mean_diff = mean(diff_value, na.rm = TRUE),
-    sd_diff   = sd(diff_value, na.rm = TRUE),
-    .groups = "drop"
-  ) %>%
-  arrange(crop, metric)
+# Normalize types for join
+half_map <- half_map %>% mutate(genotype = as.character(genotype), crop = tolower(crop))
+df_join <- df_filtered %>% mutate(test_genotype = as.character(test_genotype), crop = tolower(crop)) %>%
+    left_join(half_map, by = c("crop", "test_genotype" = "genotype"))
 
-# Print and save summary
-print("Per-crop metric difference summary:")
-print(df_summary_by_crop_metric)
-write.csv(df_summary_by_crop_metric, "./results/metric_difference_crossGenotype.csv", row.names = FALSE)
+# Now aggregate metrics by crop, train_genotype (already first/second), and test half
+df_half_summary <- df_join %>%
+    group_by(crop, train_genotype, test_half = half) %>%
+    summarise(
+        mean_IoU = mean(IoU, na.rm = TRUE),
+        mean_Precision = mean(Precision, na.rm = TRUE),
+        mean_Recall = mean(Recall, na.rm = TRUE),
+        mean_F1 = mean(F1, na.rm = TRUE),
+        n = n(),
+        .groups = "drop"
+    )
+
+# Arrange and save a single CSV with all crops and metrics
+all_halves_fname <- file.path("results", "crossGenotype_halves_summary_all_crops.csv")
+write.csv(df_half_summary, all_halves_fname, row.names = FALSE)
+cat("Saved combined halves summary to", all_halves_fname, "\n")
+
 ```
