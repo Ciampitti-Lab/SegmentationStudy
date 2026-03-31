@@ -15,37 +15,67 @@ Ciampitti Lab, 2025
 </center>
 
 - [Segmentation Study](#segmentation-study)
-  - [1. Overview](#1-overview)
-  - [2. Objectives](#2-objectives)
-  - [3. Repository Structure](#3-repository-structure)
-  - [4. Data](#4-data)
-    - [4.1. Raw Images and Masks](#41-raw-images-and-masks)
-    - [4.2. Metadata](#42-metadata)
-  - [5. Models](#5-models)
-  - [6. Experimental Design](#6-experimental-design)
-    - [6.1. Baseline: All Data](#61-baseline-all-data)
-    - [6.2. Collection Date Experiments](#62-collection-date-experiments)
-    - [6.3. Genotype Experiments](#63-genotype-experiments)
-    - [6.4. Data-Reducing Experiments](#64-data-reducing-experiments)
-    - [6.5. Transfer Learning Across Dates](#65-transfer-learning-across-dates)
-    - [6.6. Evaluation](#66-evaluation)
-  - [7. Metrics](#7-metrics)
-  - [8. Statistical Analysis](#8-statistical-analysis)
-    - [8.1. Overall Performance (All Experiments)](#81-overall-performance-all-experiments)
-    - [8.2. Cross-Genotype](#82-cross-genotype)
-    - [8.3. Cross-Date](#83-cross-date)
-    - [8.4. Data Reduction](#84-data-reduction)
-    - [8.5. Transfer Learning](#85-transfer-learning)
-  - [9. Reproducibility](#9-reproducibility)
-    - [9.1. Environment](#91-environment)
-    - [9.2. Typical Workflow](#92-typical-workflow)
-  - [10. Extending the Study](#10-extending-the-study)
-  - [11. References](#11-references)
+  - [Idealization Framework](#idealization-framework)
+    - [Vision](#vision)
+    - [Mission](#mission)
+    - [Knowledge Gap](#knowledge-gap)
+    - [Hypothesis](#hypothesis)
+    - [Objectives](#objectives)
+  - [Overview](#overview)
+  - [Repository Structure](#repository-structure)
+  - [Data](#data)
+    - [Raw Images and Masks](#raw-images-and-masks)
+    - [Metadata](#metadata)
+  - [Models](#models)
+  - [Experimental Design](#experimental-design)
+    - [Baseline: All Data](#baseline-all-data)
+    - [Collection Date Experiments](#collection-date-experiments)
+    - [Genotype Experiments](#genotype-experiments)
+    - [Data-Reducing Experiments](#data-reducing-experiments)
+    - [Transfer Learning Across Dates](#transfer-learning-across-dates)
+    - [Evaluation](#evaluation)
+  - [Metrics](#metrics)
+  - [Statistical Analysis](#statistical-analysis)
+    - [Overall Performance (All Experiments)](#overall-performance-all-experiments)
+    - [Cross-Genotype](#cross-genotype)
+    - [Cross-Date](#cross-date)
+    - [Data Reduction](#data-reduction)
+    - [Transfer Learning](#transfer-learning)
+  - [Reproducibility](#reproducibility)
+    - [Environment](#environment)
+    - [Typical Workflow](#typical-workflow)
+  - [Extending the Study](#extending-the-study)
+  - [References](#references)
 
 
 <hr>
 
-## 1. Overview
+## Idealization Framework
+
+### Vision
+To develop robust, AI-driven computer vision tools that automate and standardize the phenotyping of diverse cereal crops, enabling high-throughput and precise agricultural research for global food security.
+
+### Mission
+To benchmark and evaluate state-of-the-art deep learning segmentation architectures (UNet, SegNet, DeepLabV3+, SegFormer, MaskFormer) across multiple crops (corn, sorghum, wheat), genotypes, and phenological stages, quantifying their generalization capabilities and data efficiency through rigorous experimental design.
+
+### Knowledge Gap
+While deep learning has shown promise in plant phenotyping, there is a lack of systematic comparisons regarding how modern segmentation models handle the high intra-species variability (genotypes) and temporal changes (collection dates) in field conditions across different cereal crop organs (ears, panicles, spikes). Furthermore, the trade-off between training data volume and performance in these specific agricultural contexts remains under-explored.
+
+### Hypothesis
+State-of-the-art transformer-based models (SegFormer, MaskFormer) will outperform traditional CNN-based architectures (UNet, SegNet) in generalizing across different genotypes and collection dates due to their superior global context understanding, though their performance will be more sensitive to significant reductions in training data volume compared to established baselines.
+
+### Objectives
+
+The main objective is to compare the outputs and performance of several state-of-the-art segmentation models (UNet, SegNet, DeepLabV3+, SegFormer, MaskFormer, and related backbones) on corn ears, sorghum panicles, and wheat spikes.
+
+Concretely, the study addresses the following questions:
+
+1. What is the performance of the models considering the different genotypes and collection dates on the different crops?
+2. How do metrics change when models are trained on one collection date and evaluated on other dates (cross-date generalization)?
+3. How do metrics change when models are trained on some genotypes and evaluated on held-out genotypes (cross-genotype generalization)?
+
+
+## Overview
 
 This repository contains a complete comparative study of modern image segmentation models on field images of three cereal crops: wheat spikes, sorghum panicles, and corn ears. The aim is to quantify and compare model performance across:
 
@@ -57,18 +87,7 @@ This repository contains a complete comparative study of modern image segmentati
 The study is implemented with a combination of Python (for model training and evaluation) and R (for statistical analysis of results).
 
 
-## 2. Objectives
-
-The main objective is to compare the outputs and performance of several state-of-the-art segmentation models (UNet, SegNet, DeepLabV3+, SegFormer, MaskFormer, and related backbones) on corn ears, sorghum panicles, and wheat spikes.
-
-Concretely, the study addresses the following questions:
-
-1. What is the performance of the models considering the different genotypes and collection dates on the different crops?
-2. How do metrics change when models are trained on one collection date and evaluated on other dates (cross-date generalization)?
-3. How do metrics change when models are trained on some genotypes and evaluated on held-out genotypes (cross-genotype generalization)?
-
-
-## 3. Repository Structure
+## Repository Structure
 
 - analysis/
   - R Markdown workflows for aggregating, cleaning and analyzing model evaluation results.
@@ -88,9 +107,9 @@ Concretely, the study addresses the following questions:
   - Python utility modules for models, and helpers.
 
 
-## 4. Data
+## Data
 
-### 4.1. Raw Images and Masks
+### Raw Images and Masks
 
 The data/ folder is organized by crop:
 
@@ -109,7 +128,7 @@ Images are RGB field images, and masks are single-channel (binary) segmentation 
 
 Image and masks data are available at [this link](https://zenodo.org/records/18474786)
 
-### 4.2. Metadata
+### Metadata
 
 The file data/images_metadata.csv holds metadata per image. Typical fields include:
 
@@ -122,7 +141,7 @@ The file data/images_metadata.csv holds metadata per image. Typical fields inclu
 This metadata was used to analyze data balance for subsequent augmentation.
 
 
-## 5. Models
+## Models
 
 The study compares a suite of segmentation architectures frequently used in plant and crop phenotyping:
 
@@ -149,11 +168,11 @@ Examples:
 These models are loaded in the evaluation notebooks to generate predictions and metrics.
 
 
-## 6. Experimental Design
+## Experimental Design
 
 The study is structured as a set of complementary experiments, each implemented as one or more notebooks in notebooks/ and corresponding R analysis scripts in analysis/.
 
-### 6.1. Baseline: All Data
+### Baseline: All Data
 
 - Notebook: notebooks/trainingModels_allData.ipynb
 - Data: all available images for each crop.
@@ -162,7 +181,7 @@ The study is structured as a set of complementary experiments, each implemented 
 In this setting, the SegmentationDataset class loads images and masks from the appropriate train/ and test/ folders, normalizes images, and binarizes masks.
 
 
-### 6.2. Collection Date Experiments
+### Collection Date Experiments
 
 - Notebook: notebooks/trainingModels_collectionDates.ipynb
 - Goal: train and evaluate models separately per collection date, and study how performance varies with stage and environmental conditions.
@@ -170,7 +189,7 @@ In this setting, the SegmentationDataset class loads images and masks from the a
 Corresponding trained weights are stored as per-date model files in models/ (e.g., *date1_seg.pt, *date2_seg.pt, ...).
 
 
-### 6.3. Genotype Experiments
+### Genotype Experiments
 
 - Notebook: notebooks/trainingModels_genotypes.ipynb
 - Goal: evaluate cross-genotype generalization by training on a subset of genotypes and testing on held-out genotypes.
@@ -178,7 +197,7 @@ Corresponding trained weights are stored as per-date model files in models/ (e.g
 Metadata in data/images_metadata.csv is used to define genotype-based splits, and evaluation results are later aggregated in analysis/dataAnalysis_crossGenotype.rmd.
 
 
-### 6.4. Data-Reducing Experiments
+### Data-Reducing Experiments
 
 - Notebook: notebooks/trainingModels_dataReducing.ipynb
 - Goal: quantify how performance degrades as training data is progressively reduced (e.g., 50%, 40%, 30%, 20%, 10% of the full dataset), and evaluate the effect of data augmentation.
@@ -186,7 +205,7 @@ Metadata in data/images_metadata.csv is used to define genotype-based splits, an
 Model weights reflecting these regimes are saved with suffixes like 10less, 20less, 30less, 40less, and 50less.
 
 
-### 6.5. Transfer Learning Across Dates
+### Transfer Learning Across Dates
 
 - Notebook: notebooks/trainingModels_transferLearning.ipynb
 - Goal: investigate whether initializing from a model trained on an earlier collection date and fine-tuning on a later date improves performance versus training from scratch.
@@ -194,7 +213,7 @@ Model weights reflecting these regimes are saved with suffixes like 10less, 20le
 Models such as sorghum_SegFormer_transfer_seg.pt store the resulting transfer-learning weights.
 
 
-### 6.6. Evaluation
+### Evaluation
 
 - Notebook: notebooks/modelsEvaluation.ipynb
 
@@ -217,7 +236,7 @@ This notebook:
 These results serve as the input for the downstream R-based statistical analyses.
 
 
-## 7. Metrics
+## Metrics
 
 The main metrics used in this study are:
 
@@ -229,11 +248,11 @@ The main metrics used in this study are:
 Additional metrics such as Pixel Accuracy, Dice Coefficient, MAE, and Hausdorff Distance are described in docs/MetricsReview.md, and may be used for robustness checks or specific analyses.
 
 
-## 8. Statistical Analysis
+## Statistical Analysis
 
 Statistical and exploratory analyses are implemented in R Markdown files in analysis/.
 
-### 8.1. Overall Performance (All Experiments)
+### Overall Performance (All Experiments)
 
 - File: analysis/dataAnalysis_all.Rmd
 
@@ -254,7 +273,7 @@ Workflow:
 These outputs provide a compact view of how each model performs across crops.
 
 
-### 8.2. Cross-Genotype
+### Cross-Genotype
 
 - File: analysis/dataAnalysis_crossGenotype.rmd
 
@@ -264,7 +283,7 @@ Focus:
 - Evaluate stability of IoU, Precision, Recall, and F1 across genotypes.
 
 
-### 8.3. Cross-Date
+### Cross-Date
 
 - File: analysis/dataAnalysis_crossDate.Rmd
 
@@ -274,7 +293,7 @@ Focus:
 - Quantify degradation or improvement across phenological stages.
 
 
-### 8.4. Data Reduction
+### Data Reduction
 
 - File: analysis/dataAnalysis_dataReducing.Rmd
 
@@ -284,7 +303,7 @@ Focus:
 - Quantify how metrics drop as data is removed and how augmentation mitigates this drop.
 
 
-### 8.5. Transfer Learning
+### Transfer Learning
 
 - File: analysis/dataAnalysis_transfer.Rmd
 
@@ -294,9 +313,9 @@ Focus:
 - Evaluate whether fine-tuning from an earlier date improves metrics on later dates.
 
 
-## 9. Reproducibility
+## Reproducibility
 
-### 9.1. Environment
+### Environment
 
 Python:
 
@@ -309,7 +328,7 @@ R:
 - tidyverse for data wrangling.
 - patchwork for combining plots.
 
-### 9.2. Typical Workflow
+### Typical Workflow
 
 To reproduce the study or adapt it to new data:
 
@@ -339,7 +358,7 @@ To reproduce the study or adapt it to new data:
      - Export summary tables in results/.
 
 
-## 10. Extending the Study
+## Extending the Study
 
 To extend this study to new crops, organs, or models:
 
@@ -350,7 +369,7 @@ To extend this study to new crops, organs, or models:
 - Add new analysis scripts in analysis/ or extend existing ones to incorporate the additional factors.
 
 
-## 11. References
+## References
 
 - See docs/LiteratureReview.md for a curated list of segmentation architectures and plant science applications relevant to this study.
 - See docs/MetricsReview.md for definitions and interpretations of segmentation metrics used throughout the analyses.
