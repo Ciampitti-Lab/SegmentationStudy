@@ -269,6 +269,8 @@ Workflow:
 5. Export summary tables to results/:
    - summary_statistics_by_crop_model_all.csv
    - summary_stats_short_by_crop_model.csv
+6. ANOVA analysis for IoU considering Genotype, collection date and their interaction as factors.
+7. t-test comparing the IoU values for the genotypes that presented mean maximum and mean minimum.
 
 These outputs provide a compact view of how each model performs across crops.
 
@@ -281,6 +283,7 @@ Focus:
 
 - Compare model performance when genotypes are held out at evaluation time.
 - Evaluate stability of IoU, Precision, Recall, and F1 across genotypes.
+- t-test comparing the first and second halves.
 
 
 ### Cross-Date
@@ -291,6 +294,7 @@ Focus:
 
 - Evaluate models trained on one collection date and tested on other dates.
 - Quantify degradation or improvement across phenological stages.
+- ANOVA comparing the IoU values for the evaluated collection dates for all the training dates.
 
 
 ### Data Reduction

@@ -1,0 +1,14 @@
+T-test for metric Precision comparing 26 (min) vs 42 (max) for crop sorghum 
+
+
+	Welch Two Sample t-test
+
+data:  Precision by genotype
+t = -9.6343, df = 28.488, p-value = 1.828e-10
+alternative hypothesis: true difference in means between group 26 and group 42 is not equal to 0
+95 percent confidence interval:
+ -0.08001520 -0.05197379
+sample estimates:
+mean in group 26 mean in group 42 
+       0.9105912        0.9765857 
+

@@ -1,0 +1,7 @@
+ANOVA IoU ~ test_date for crop: wheat_SegFormer train_date: 3 
+
+              Df Sum Sq Mean Sq F value Pr(>F)    
+test_date      4  68.15  17.038   516.4 <2e-16 ***
+Residuals   3547 117.03   0.033                   
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1

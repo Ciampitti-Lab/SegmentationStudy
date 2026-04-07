@@ -1,0 +1,14 @@
+T-test for metric Precision comparing 38 (min) vs 30 (max) for crop wheat 
+
+
+	Welch Two Sample t-test
+
+data:  Precision by genotype
+t = -5.8047, df = 17.296, p-value = 1.973e-05
+alternative hypothesis: true difference in means between group 38 and group 30 is not equal to 0
+95 percent confidence interval:
+ -0.07223669 -0.03376053
+sample estimates:
+mean in group 38 mean in group 30 
+       0.9064757        0.9594743 
+

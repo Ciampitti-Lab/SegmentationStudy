@@ -1,0 +1,14 @@
+T-test for metric Recall comparing 44 (min) vs 71 (max) for crop corn 
+
+
+	Welch Two Sample t-test
+
+data:  Recall by genotype
+t = -3.7268, df = 2.0485, p-value = 0.06269
+alternative hypothesis: true difference in means between group 44 and group 71 is not equal to 0
+95 percent confidence interval:
+ -0.17304114  0.01046418
+sample estimates:
+mean in group 44 mean in group 71 
+       0.8955151        0.9768036 
+

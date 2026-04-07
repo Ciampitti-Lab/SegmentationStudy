@@ -1,0 +1,14 @@
+T-test for metric F1 comparing 39 (min) vs 80 (max) for crop sorghum 
+
+
+	Welch Two Sample t-test
+
+data:  F1 by genotype
+t = -20.196, df = 23.268, p-value = 2.981e-16
+alternative hypothesis: true difference in means between group 39 and group 80 is not equal to 0
+95 percent confidence interval:
+ -0.06280837 -0.05114396
+sample estimates:
+mean in group 39 mean in group 80 
+       0.9218603        0.9788364 
+

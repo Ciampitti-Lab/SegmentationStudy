@@ -1,0 +1,14 @@
+T-test for metric Recall comparing 27 (min) vs 80 (max) for crop sorghum 
+
+
+	Welch Two Sample t-test
+
+data:  Recall by genotype
+t = -3.5583, df = 15.594, p-value = 0.002713
+alternative hypothesis: true difference in means between group 27 and group 80 is not equal to 0
+95 percent confidence interval:
+ -0.07056467 -0.01780518
+sample estimates:
+mean in group 27 mean in group 80 
+       0.9402641        0.9844490 
+

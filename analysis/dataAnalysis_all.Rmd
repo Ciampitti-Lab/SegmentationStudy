@@ -2,11 +2,12 @@
 ```{r}
 library(tidyverse)
 library(patchwork)
+library(car)
 ```
 
 # Data Import
 ```{r}
-df <- read.csv("./results/model_evaluation_results.csv")
+df <- read.csv("./results/model_evaluation_results_rev.csv")
 head(df)
 ```
 
@@ -299,3 +300,131 @@ p_date_crop <- ggplot(df_summary_date, aes(x = collectiondate, y = mean_IoU, col
 print(p_date_crop)
 ggsave("./results/mean_IoU_by_crop_by_date.png", plot = p_date_crop, width = 8, height = 10, dpi = 600)
 ```
+
+## Type I and III ANOVA (IoU) for selected crop-models
+
+```{r}
+
+df_sel <- df_no_outliers %>%
+    filter(crop == trimws(tolower("corn")), modelname == "SegFormer")
+
+df_sel <- df_sel %>%
+    mutate(genotype = as.factor(genotype),
+           collectiondate = as.factor(trimws(as.character(collectiondate))))
+
+#fit <- tryCatch(aov(IoU ~ genotype * collectiondate, data = df_sel), error = function(e) e)
+fit <- tryCatch(lm(IoU ~ genotype * collectiondate, data = df_sel), error = function(e) e)
+if (inherits(fit, "error")) {
+  message("ANOVA failed for corn - SegFormer: ", fit$message)
+  next
+}
+out_prefix <- paste0("./results/anova_IoU_", "corn", "_", gsub("\\s+", "_", "SegFormer"))
+
+#aov_summary <- summary(fit)[[1]]
+aov_summary <- summary(fit)
+aov_df <- as.data.frame(aov_summary)
+#aov_df <- tibble::rownames_to_column(aov_df, var = "Term")
+aov_df <- tibble::rownames_to_column(aov_df)
+write.csv(aov_df, paste0(out_prefix, "_table.csv"), row.names = FALSE)
+
+# Append human-readable output to a text log
+sink(paste0(out_prefix, "_summary.txt"))
+cat("ANOVA for", "corn", "-", "SegFormer", "\n\n")
+print(summary(fit))
+sink()
+```
+
+## t-tests
+
+```{r}
+# T-tests for min vs max genotypes across all performance metrics
+ext_file <- "./results/genotype_mean_extremes_by_crop_model.csv"
+if (!file.exists(ext_file)) stop("Extremes file not found: ", ext_file)
+extremes <- read.csv(ext_file, stringsAsFactors = FALSE)
+
+metrics_all <- c("IoU", "Precision", "Recall", "F1")
+all_results <- list()
+
+for (metric in metrics_all) {
+  metric_label <- paste(metric, "Mean")
+  ext_metric <- extremes %>%
+    filter(metric == metric_label) %>%
+    transmute(crop = trimws(tolower(as.character(crop))),
+              genotype_min = as.character(min_genotype),
+              genotype_max = as.character(max_genotype)) %>%
+    distinct()
+
+  metric_results <- list()
+  for (i in seq_len(nrow(ext_metric))) {
+    row <- ext_metric[i, ]
+    crop_i <- row$crop
+    g_min <- row$genotype_min
+    g_max <- row$genotype_max
+    out_prefix <- paste0("./results/ttest_", metric, "_", crop_i, "_", g_min, "_vs_", g_max)
+
+    df_pair <- df_no_outliers %>%
+      mutate(crop = trimws(tolower(as.character(crop))),
+             genotype = as.character(genotype)) %>%
+      filter(crop == crop_i, genotype %in% c(g_min, g_max)) %>%
+      mutate(genotype = factor(genotype, levels = c(g_min, g_max)))
+
+    n_min <- sum(df_pair$genotype == g_min, na.rm = TRUE)
+    n_max <- sum(df_pair$genotype == g_max, na.rm = TRUE)
+
+    if (n_min < 2 || n_max < 2) {
+      metric_results[[i]] <- tibble(
+        metric = metric, crop = crop_i, genotype_min = g_min, genotype_max = g_max,
+        n_min = n_min, n_max = n_max, t_stat = NA_real_, df = NA_real_, p_value = NA_real_,
+        mean_min = ifelse(n_min>0, mean(df_pair[[metric]][df_pair$genotype==g_min], na.rm=TRUE), NA_real_),
+        mean_max = ifelse(n_max>0, mean(df_pair[[metric]][df_pair$genotype==g_max], na.rm=TRUE), NA_real_)
+      )
+      writeLines(paste("Not enough observations for t-test:", out_prefix), con = paste0(out_prefix, "_note.txt"))
+      next
+    }
+
+    tt <- tryCatch(t.test(stats::as.formula(paste0(metric, " ~ genotype")), data = df_pair), error = function(e) e)
+    if (inherits(tt, "error")) {
+      metric_results[[i]] <- tibble(
+        metric = metric, crop = crop_i, genotype_min = g_min, genotype_max = g_max,
+        n_min = n_min, n_max = n_max, t_stat = NA_real_, df = NA_real_, p_value = NA_real_,
+        mean_min = mean(df_pair[[metric]][df_pair$genotype==g_min], na.rm=TRUE),
+        mean_max = mean(df_pair[[metric]][df_pair$genotype==g_max], na.rm=TRUE)
+      )
+      writeLines(paste("t.test error:", tt$message), con = paste0(out_prefix, "_error.txt"))
+      next
+    }
+
+    res <- tibble(
+      metric = metric,
+      crop = crop_i,
+      genotype_min = g_min,
+      genotype_max = g_max,
+      n_min = n_min,
+      n_max = n_max,
+      t_stat = as.numeric(tt$statistic),
+      df = as.numeric(tt$parameter),
+      p_value = as.numeric(tt$p.value),
+      conf_low = as.numeric(tt$conf.int[1]),
+      conf_high = as.numeric(tt$conf.int[2]),
+      mean_min = mean(df_pair[[metric]][df_pair$genotype==g_min], na.rm=TRUE),
+      mean_max = mean(df_pair[[metric]][df_pair$genotype==g_max], na.rm=TRUE)
+    )
+
+    metric_results[[i]] <- res
+
+    sink(paste0(out_prefix, "_summary.txt"))
+    cat("T-test for metric", metric, "comparing", g_min, "(min) vs", g_max, "(max)", "for crop", crop_i, "\n\n")
+    print(tt)
+    sink()
+  }
+
+  metric_tbl <- bind_rows(metric_results)
+  write.csv(metric_tbl, paste0("./results/ttest_min_vs_max_", metric, "_by_crop.csv"), row.names = FALSE)
+  all_results[[metric]] <- metric_tbl
+}
+
+tt_all <- bind_rows(all_results)
+write.csv(tt_all, "./results/ttest_min_vs_max_by_crop_metric.csv", row.names = FALSE)
+print(tt_all)
+```
+

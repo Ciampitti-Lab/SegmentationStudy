@@ -1,0 +1,9 @@
+ANOVA for sorghum - SegFormer 
+
+                         Df Sum Sq  Mean Sq F value  Pr(>F)    
+genotype                 79 0.8633 0.010928  19.763 < 2e-16 ***
+collectiondate            4 0.0538 0.013456  24.334 < 2e-16 ***
+genotype:collectiondate 307 0.2267 0.000739   1.336 0.00129 ** 
+Residuals               650 0.3594 0.000553                    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1

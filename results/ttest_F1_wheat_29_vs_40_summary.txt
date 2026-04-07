@@ -1,0 +1,14 @@
+T-test for metric F1 comparing 29 (min) vs 40 (max) for crop wheat 
+
+
+	Welch Two Sample t-test
+
+data:  F1 by genotype
+t = -10.876, df = 23.767, p-value = 1.043e-10
+alternative hypothesis: true difference in means between group 29 and group 40 is not equal to 0
+95 percent confidence interval:
+ -0.05411636 -0.03684609
+sample estimates:
+mean in group 29 mean in group 40 
+       0.9077101        0.9531913 
+

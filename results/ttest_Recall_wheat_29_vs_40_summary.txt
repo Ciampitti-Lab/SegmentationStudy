@@ -1,0 +1,14 @@
+T-test for metric Recall comparing 29 (min) vs 40 (max) for crop wheat 
+
+
+	Welch Two Sample t-test
+
+data:  Recall by genotype
+t = -11.272, df = 22.228, p-value = 1.155e-10
+alternative hypothesis: true difference in means between group 29 and group 40 is not equal to 0
+95 percent confidence interval:
+ -0.10172496 -0.07012704
+sample estimates:
+mean in group 29 mean in group 40 
+       0.8740713        0.9599973 
+

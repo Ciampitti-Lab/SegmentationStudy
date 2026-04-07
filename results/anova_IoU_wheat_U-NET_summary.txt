@@ -1,0 +1,9 @@
+ANOVA for wheat - U-NET 
+
+                         Df  Sum Sq  Mean Sq F value  Pr(>F)    
+genotype                 39 0.22128 0.005674   7.496 < 2e-16 ***
+collectiondate            4 0.01261 0.003151   4.164 0.00267 ** 
+genotype:collectiondate 154 0.16213 0.001053   1.391 0.00774 ** 
+Residuals               311 0.23539 0.000757                    
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1

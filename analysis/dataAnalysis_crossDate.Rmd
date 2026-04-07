@@ -5,7 +5,7 @@ library(tidyverse)
 
 # Load the data
 ```{r}
-df <- read.csv("./results/model_evaluation_crossDate_corn.csv")
+df <- read.csv("./results/model_evaluation_crossDate_corn_rev.csv")
 ```
 
 # Making the "Correlation" Table
@@ -28,6 +28,72 @@ for (cr in unique(df_corr$crop)) {
   print(correlation_tables %>% filter(crop == cr) %>% select(-crop))
 }
 
-write.csv(correlation_tables, "./results/crossDate_corn.csv", row.names = FALSE)
+write.csv(correlation_tables, "./results/crossDate_corn_rev.csv", row.names = FALSE)
 
+```
+
+## ANOVA by train_date: IoU ~ test_date (cross-date files)
+
+```{r}
+# Find cross-date files for crops
+cross_files <- list.files("./results", pattern = "model_evaluation_crossDate_.*\\.csv$", full.names = TRUE)
+if (length(cross_files) == 0) message("No cross-date files found in ./results/")
+
+for (f in cross_files) {
+  dat <- read.csv(f, stringsAsFactors = FALSE)
+  # infer crop name from file
+  fname <- basename(f)
+  crop_name <- sub("model_evaluation_crossDate_(.*)\\.csv$", "\\1", fname)
+
+  # ensure columns exist
+  if (!all(c("train_date", "test_date", "IoU") %in% colnames(dat))) {
+    message("Skipping ", fname, ": missing required columns")
+    next
+  }
+
+  train_dates <- sort(unique(dat$train_date))
+  for (td in train_dates) {
+    df_td <- dat %>% filter(train_date == td)
+    if (nrow(df_td) == 0) next
+
+    df_td <- df_td %>% mutate(test_date = as.factor(test_date))
+    out_prefix <- paste0("./results/anova_crossDate_", crop_name, "_train", td)
+
+    # check number of test_date levels
+    n_levels <- nlevels(df_td$test_date)
+    if (n_levels < 2) {
+      writeLines(paste("Only", n_levels, "test_date level for", crop_name, "train", td), con = paste0(out_prefix, "_note.txt"))
+      next
+    }
+
+    fit <- tryCatch(aov(IoU ~ test_date, data = df_td), error = function(e) e)
+    if (inherits(fit, "error")) {
+      writeLines(paste("ANOVA error for", crop_name, "train", td, ":", fit$message), con = paste0(out_prefix, "_error.txt"))
+      next
+    }
+
+    aov_sum <- summary(fit)[[1]]
+    aov_df <- as.data.frame(aov_sum)
+    aov_df <- tibble::rownames_to_column(aov_df, var = "Term")
+    write.csv(aov_df, paste0(out_prefix, "_table.csv"), row.names = FALSE)
+
+    # save human-readable summary
+    sink(paste0(out_prefix, "_summary.txt"))
+    cat("ANOVA IoU ~ test_date for crop:", crop_name, "train_date:", td, "\n\n")
+    print(summary(fit))
+    sink()
+
+    # Tukey HSD post-hoc
+    if (n_levels > 1) {
+      tuk <- tryCatch(TukeyHSD(fit, "test_date"), error = function(e) e)
+      if (!inherits(tuk, "error")) {
+        tuk_df <- as.data.frame(tuk$test_date)
+        tuk_df <- tibble::rownames_to_column(tuk_df, var = "Comparison")
+        write.csv(tuk_df, paste0(out_prefix, "_tukey.csv"), row.names = FALSE)
+      } else {
+        writeLines(paste("Tukey error:", tuk$message), con = paste0(out_prefix, "_tukey_error.txt"))
+      }
+    }
+  }
+}
 ```

@@ -1,0 +1,14 @@
+T-test for metric Precision comparing 46 (min) vs 86 (max) for crop corn 
+
+
+	Welch Two Sample t-test
+
+data:  Precision by genotype
+t = -1.742, df = 2.2457, p-value = 0.2097
+alternative hypothesis: true difference in means between group 46 and group 86 is not equal to 0
+95 percent confidence interval:
+ -0.1174336  0.0446790
+sample estimates:
+mean in group 46 mean in group 86 
+       0.9319950        0.9683723 
+

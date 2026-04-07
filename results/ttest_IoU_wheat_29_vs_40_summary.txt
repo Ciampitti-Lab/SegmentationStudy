@@ -1,0 +1,14 @@
+T-test for metric IoU comparing 29 (min) vs 40 (max) for crop wheat 
+
+
+	Welch Two Sample t-test
+
+data:  IoU by genotype
+t = -11.101, df = 25.594, p-value = 2.805e-11
+alternative hypothesis: true difference in means between group 29 and group 40 is not equal to 0
+95 percent confidence interval:
+ -0.09429852 -0.06481266
+sample estimates:
+mean in group 29 mean in group 40 
+       0.8312642        0.9108198 
+

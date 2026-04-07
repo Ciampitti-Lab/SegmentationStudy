@@ -114,3 +114,62 @@ write.csv(df_half_summary, all_halves_fname, row.names = FALSE)
 cat("Saved combined halves summary to", all_halves_fname, "\n")
 
 ```
+
+## Perform Welch two-sample t-tests on IoU between halves per crop + train_genotype
+```{r}
+# Ensure we have the joined data with `half` column (from earlier)
+if(!exists("df_join")) stop("df_join not found; run the earlier data-prep chunk first")
+
+# Normalize `half` column name if necessary (accepts either `half` or `test_half`)
+if(!"half" %in% colnames(df_join)) {
+    if("test_half" %in% colnames(df_join)) {
+        df_join <- df_join %>% dplyr::rename(half = test_half)
+    } else {
+        stop("No 'half' or 'test_half' column found in df_join; cannot run t-tests")
+    }
+}
+
+# Perform t-tests (Welch) for IoU comparing First Half vs Second Half
+library(dplyr)
+
+t_results <- df_join %>%
+        filter(!is.na(half)) %>%
+    group_by(crop, train_genotype) %>%
+    group_modify(~{
+        dat <- .x
+        if(length(unique(dat$half)) < 2) {
+            return(tibble::tibble(
+                metric = "IoU",
+                t_stat = NA_real_,
+                df = NA_real_,
+                p_value = NA_real_,
+                mean_first = if("First Half" %in% dat$half) mean(dat$IoU[dat$half=="First Half"], na.rm=TRUE) else NA_real_,
+                mean_second = if("Second Half" %in% dat$half) mean(dat$IoU[dat$half=="Second Half"], na.rm=TRUE) else NA_real_,
+                mean_diff = mean_second - mean_first,
+                n_first = sum(dat$half=="First Half", na.rm=TRUE),
+                n_second = sum(dat$half=="Second Half", na.rm=TRUE)
+            ))
+        } else {
+            x <- dat$IoU[dat$half=="First Half"]
+            y <- dat$IoU[dat$half=="Second Half"]
+            tt <- t.test(x, y, alternative = "two.sided", var.equal = FALSE)
+            tibble::tibble(
+                metric = "IoU",
+                t_stat = as.numeric(tt$statistic),
+                df = as.numeric(tt$parameter),
+                p_value = as.numeric(tt$p.value),
+                mean_first = mean(x, na.rm=TRUE),
+                mean_second = mean(y, na.rm=TRUE),
+                mean_diff = mean(y, na.rm=TRUE) - mean(x, na.rm=TRUE),
+                n_first = sum(!is.na(x)),
+                n_second = sum(!is.na(y))
+            )
+        }
+    }) %>%
+    ungroup()
+
+# Save t-test results
+tt_fname <- file.path("results", "crossGenotype_ttests_IoU_by_train_genotype_and_half.csv")
+write.csv(t_results, tt_fname, row.names = FALSE)
+cat("Saved t-test results to", tt_fname, "\n")
+```

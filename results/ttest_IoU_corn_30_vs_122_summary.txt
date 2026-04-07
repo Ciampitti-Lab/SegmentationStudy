@@ -1,0 +1,14 @@
+T-test for metric IoU comparing 30 (min) vs 122 (max) for crop corn 
+
+
+	Welch Two Sample t-test
+
+data:  IoU by genotype
+t = -6.3175, df = 3.0686, p-value = 0.00749
+alternative hypothesis: true difference in means between group 30 and group 122 is not equal to 0
+95 percent confidence interval:
+ -0.13575479 -0.04556171
+sample estimates:
+ mean in group 30 mean in group 122 
+        0.8361682         0.9268264 
+

@@ -1,0 +1,12 @@
+
+	Welch Two Sample t-test
+
+data:  IoU by half
+t = -0.46098, df = 9260.1, p-value = 0.6448
+alternative hypothesis: true difference in means between group First Half and group Second Half is not equal to 0
+95 percent confidence interval:
+ -0.003622948  0.002243388
+sample estimates:
+ mean in group First Half mean in group Second Half 
+                0.8668036                 0.8674934 
+

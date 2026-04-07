@@ -1,0 +1,14 @@
+T-test for metric F1 comparing 30 (min) vs 122 (max) for crop corn 
+
+
+	Welch Two Sample t-test
+
+data:  F1 by genotype
+t = -6.1985, df = 2.7377, p-value = 0.01101
+alternative hypothesis: true difference in means between group 30 and group 122 is not equal to 0
+95 percent confidence interval:
+ -0.07873655 -0.02335950
+sample estimates:
+ mean in group 30 mean in group 122 
+        0.9107385         0.9617865 
+

@@ -1,0 +1,7 @@
+ANOVA IoU ~ test_date for crop: corn train_date: 4 
+
+              Df Sum Sq Mean Sq F value Pr(>F)    
+test_date      5  129.0  25.800   471.3 <2e-16 ***
+Residuals   5340  292.3   0.055                   
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1

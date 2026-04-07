@@ -1,0 +1,14 @@
+T-test for metric IoU comparing 39 (min) vs 80 (max) for crop sorghum 
+
+
+	Welch Two Sample t-test
+
+data:  IoU by genotype
+t = -20.8, df = 24.107, p-value < 2.2e-16
+alternative hypothesis: true difference in means between group 39 and group 80 is not equal to 0
+95 percent confidence interval:
+ -0.11357315 -0.09307334
+sample estimates:
+mean in group 39 mean in group 80 
+       0.8552671        0.9585904 
+
