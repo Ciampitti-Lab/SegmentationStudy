@@ -90,6 +90,62 @@ for (f in cross_files) {
         tuk_df <- as.data.frame(tuk$test_date)
         tuk_df <- tibble::rownames_to_column(tuk_df, var = "Comparison")
         write.csv(tuk_df, paste0(out_prefix, "_tukey.csv"), row.names = FALSE)
+        
+        # Attempt to create compact letter display (CLD) for multiple comparisons
+        cld_fname <- paste0(out_prefix, "_tukey_cld.csv")
+        # Compute group means for letter ordering (highest mean => "a")
+        grp_means <- tapply(df_td$IoU, df_td$test_date, mean, na.rm = TRUE)
+        # Try multcompView first
+        cld_written <- FALSE
+        try({
+          if(!requireNamespace("multcompView", quietly = TRUE)) stop("multcompView not available")
+          tuk_df2 <- as.data.frame(tuk$test_date)
+          pvec <- tuk_df2[["p adj"]]
+          names(pvec) <- rownames(tuk_df2)
+          ml <- multcompView::multcompLetters(pvec)
+          raw_letters <- ml$Letters
+          # Relabel so "a" = highest-mean group (multcompLetters orders by factor level, not mean)
+          grp_order <- names(sort(grp_means, decreasing = TRUE))
+          seen_ltr <- character(0)
+          lmap <- list()
+          new_idx <- 1L
+          for (grp in grp_order) {
+            for (ch in strsplit(raw_letters[grp], "")[[1]]) {
+              if (!ch %in% seen_ltr) {
+                lmap[[ch]] <- letters[new_idx]
+                seen_ltr <- c(seen_ltr, ch)
+                new_idx <- new_idx + 1L
+              }
+            }
+          }
+          relabeled <- sapply(raw_letters, function(ltr)
+            paste0(sapply(strsplit(ltr, "")[[1]], function(c) lmap[[c]]), collapse = ""))
+          letters_df <- tibble::tibble(
+            test_date = names(relabeled),
+            letter    = unname(relabeled),
+            mean_IoU  = grp_means[names(relabeled)]
+          )
+          letters_df <- dplyr::arrange(letters_df, dplyr::desc(mean_IoU))
+          write.csv(letters_df, cld_fname, row.names = FALSE)
+          cld_written <- TRUE
+        }, silent = TRUE)
+
+        # Fallback to agricolae HSD groups if multcompView not available
+        # agricolae already assigns "a" to the highest mean by default
+        if(!cld_written) {
+          try({
+            if(!requireNamespace("agricolae", quietly = TRUE)) stop("agricolae not available")
+            hsd <- agricolae::HSD.test(fit, "test_date", group = TRUE)
+            grp_df <- as.data.frame(hsd$groups)
+            grp_df <- tibble::rownames_to_column(grp_df, var = "test_date") %>%
+              dplyr::select(test_date, groups) %>%
+              dplyr::rename(letter = groups) %>%
+              dplyr::mutate(mean_IoU = grp_means[test_date]) %>%
+              dplyr::arrange(dplyr::desc(mean_IoU))
+            write.csv(grp_df, cld_fname, row.names = FALSE)
+            cld_written <- TRUE
+          }, silent = TRUE)
+        }
       } else {
         writeLines(paste("Tukey error:", tuk$message), con = paste0(out_prefix, "_tukey_error.txt"))
       }
